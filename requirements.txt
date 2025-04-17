@@ -1,0 +1,2 @@
+mcp[cli]>=1.5.0
+nbformat>=5.0.0 
