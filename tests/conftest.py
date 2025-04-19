@@ -9,13 +9,14 @@ import asyncio
 from pathlib import Path
 from typing import List, Callable
 import uuid
+import shutil # Add import for shutil
 
 # Add project root to sys.path to allow importing the package
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import necessary components from the package and server script
-from notebook_mcp_server import ServerConfig
+from cursor_notebook_mcp.server import ServerConfig
 from cursor_notebook_mcp.tools import NotebookTools
 from mcp.server.fastmcp import FastMCP
 
@@ -67,5 +68,35 @@ def notebook_path_factory(temp_notebook_dir: Path) -> Callable[[], str]:
     
     return _create_path
 
+# Fixture to provide an async event loop for tests marked with @pytest.mark.asyncio
+# This might be automatically handled by pytest-asyncio, but defining it explicitly can sometimes help.
 # Removing custom event_loop fixture as pytest-asyncio provides one automatically
-# and redefining it causes a DeprecationWarning. 
+# and redefining it causes a DeprecationWarning.
+
+@pytest.fixture(scope="session")
+def cli_command_path() -> str:
+    """
+    Returns the absolute path to the installed cursor-notebook-mcp script
+    within the current environment's bin directory. Skips tests if not found.
+    """
+    # Find the bin/Scripts directory associated with the current Python executable
+    python_executable = sys.executable
+    venv_bin_path = Path(python_executable).parent
+
+    # Construct the expected path to the script
+    script_name = "cursor-notebook-mcp"
+    # Handle potential .exe extension on Windows
+    if sys.platform == "win32":
+        script_name += ".exe"
+
+    script_path = venv_bin_path / script_name
+
+    if not script_path.exists():
+        # Alternative check using shutil.which, which searches PATH
+        found_path = shutil.which(script_name)
+        if found_path:
+             script_path = Path(found_path)
+        else:
+             pytest.skip(f"'{script_name}' command not found in venv bin or PATH.")
+
+    return str(script_path) 

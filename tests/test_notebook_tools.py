@@ -11,6 +11,7 @@ import nbformat
 from pathlib import Path
 import importlib
 import json
+import asyncio
 
 # Import the class to be tested
 from cursor_notebook_mcp.tools import NotebookTools
@@ -694,3 +695,49 @@ async def test_export_notebook(notebook_tools_inst: NotebookTools, notebook_path
     # Test exporting outside allowed root
     with pytest.raises(PermissionError):
          await notebook_tools_inst.notebook_export(notebook_path=nb_path, export_format="python", output_path="/tmp/unsafe_export.py") 
+
+# --- Tests for CLI Entry Point ---
+
+@pytest.mark.asyncio
+async def test_cli_entry_point_help(cli_command_path):
+    """Test running the installed command with --help."""
+    process = await asyncio.create_subprocess_exec(
+        cli_command_path,
+        '--help',
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+
+    print(f"CLI --help STDOUT:\n{stdout}")
+    print(f"CLI --help STDERR:\n{stderr}")
+
+    assert process.returncode == 0 # Expect clean exit for --help
+    assert "usage: cursor-notebook-mcp" in stdout # Check for usage string
+    assert "Jupyter Notebook MCP Server" in stdout # Check for description
+    # Argparse exits after help, which our main() catches and prints to stderr
+    assert "Configuration failed: 0" in stderr 
+
+@pytest.mark.asyncio
+async def test_cli_entry_point_no_root(cli_command_path):
+    """Test running the installed command without required --allow-root."""
+    process = await asyncio.create_subprocess_exec(
+        cli_command_path,
+        # No arguments provided
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+    stdout = stdout.decode()
+    stderr = stderr.decode()
+
+    print(f"CLI no-args STDOUT:\n{stdout}")
+    print(f"CLI no-args STDERR:\n{stderr}")
+
+    assert process.returncode != 0 # Expect non-zero exit code
+    # Check for the argparse error message about missing argument
+    assert "the following arguments are required: --allow-root" in stderr
+    # Check our specific error message as well
+    assert "Configuration failed:" in stderr 

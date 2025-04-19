@@ -1,3 +1,8 @@
+[![PyPI Version](https://img.shields.io/pypi/v/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/)
+[![Python Version](https://img.shields.io/pypi/pyversions/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/)
+[![License](https://img.shields.io/github/license/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp/blob/main/LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp)
+
 # Jupyter Notebook MCP Server (for Cursor)
 
 This directory contains a Model Context Protocol (MCP) server designed to allow AI agents **within Cursor** to interact with Jupyter Notebook (`.ipynb`) files. It was created to overcome a limitation with Cursor. As of version 0.48.9, in Agent mode, the model could not edit notebooks or notebook cells in response to dialog in the AI chat pane. This provides the agent with a suite of MCP tools that allow direct notebook cell manipulation.
@@ -46,7 +51,7 @@ Exposes the following MCP tools (registered under the `notebook_mcp` server):
 
 ## Installation
 
-### From PyPI (If Published)
+### From PyPI
 
 ```bash
 # Basic installation (stdio transport only)

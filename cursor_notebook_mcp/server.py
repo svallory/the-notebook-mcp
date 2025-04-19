@@ -1,34 +1,37 @@
-#!/usr/bin/env python3
 """
-Main entry point for the Jupyter Notebook MCP Server.
-Supports both stdio and SSE transports.
+Server entry point logic within the package.
+
+Handles argument parsing, configuration, logging setup,
+and launching the appropriate transport.
 """
 
 import asyncio
 import sys
 import os
 import argparse
-# Remove unused imports if any left after refactor
-# import subprocess 
-# import importlib.util 
-# from pathlib import Path
-from typing import Any, List, Dict # Keep Any, List, Dict for config/type hints
+from typing import Any, List, Dict
 import logging
 
-# Ensure required libraries are available
+# --- Package-Internal Imports ---
+# Ensure these succeed when running as part of the package
 try:
-    import mcp.types as types
+    from .tools import NotebookTools
+    from .sse_transport import run_sse_server
+except ImportError as e:
+    print(f"Error importing package components: {e}. Ensure package structure is correct.", file=sys.stderr)
+    sys.exit(1)
+
+# --- External Dependencies ---
+try:
     from mcp.server.fastmcp import FastMCP
     import nbformat
 except ImportError as e:
-    print(f"FATAL: Failed to import required libraries. Make sure 'mcp-sdk' and 'nbformat' are installed. Error: {e}", file=sys.stderr)
+    # This might occur if dependencies aren't installed correctly
+    print(f"FATAL: Failed to import required libraries (mcp, nbformat, etc.). Error: {e}", file=sys.stderr)
+    # Add hint about installing extras if it's an SSE component missing
+    if "SseServerTransport" in str(e) or "uvicorn" in str(e) or "starlette" in str(e):
+        print("Hint: SSE transport requires optional dependencies. Try installing with '[sse]' extra.", file=sys.stderr)
     sys.exit(1)
-
-# --- Project Structure Imports ---
-# Import necessary components from our modules
-from cursor_notebook_mcp.tools import NotebookTools
-from cursor_notebook_mcp.sse_transport import run_sse_server
-# notebook_ops is used by tools.py, not directly here
 
 # --- Logging Setup ---
 DEFAULT_LOG_DIR = os.path.expanduser("~/.cursor_notebook_mcp")
@@ -66,11 +69,6 @@ def setup_logging(log_dir: str, log_level: int):
         except Exception as e:
             print(f"WARNING: Could not set up file logging to {log_file}. Error: {e}", file=sys.stderr)
             log_file = None # Indicate failure
-    else:
-        # Only print info message if logging was attempted but failed
-        if args and args.log_dir: # Check if log_dir was specified
-             print(f"INFO: File logging disabled (could not create/access {args.log_dir}).", file=sys.stderr)
-        # Otherwise, no message needed if it wasn't specified
 
     # Stream Handler (stderr)
     stream_handler = logging.StreamHandler(sys.stderr)
@@ -85,11 +83,9 @@ def setup_logging(log_dir: str, log_level: int):
     else:
         logging.info(f"{initial_message} Logging to stderr only.")
 
-
 # --- Configuration Class ---
 class ServerConfig:
     """Holds server configuration derived from arguments."""
-    # Make attributes more specific
     allowed_roots: List[str]
     max_cell_source_size: int
     max_cell_output_size: int
@@ -107,22 +103,16 @@ class ServerConfig:
         self.host = args.host
         self.port = args.port
 
-        # Validate and store allowed roots
         validated_roots = []
         if args.allow_root:
             for root in args.allow_root:
                 if not os.path.isabs(root):
                     raise ValueError(f"--allow-root path must be absolute: {root}")
-                # Ensure directory exists
                 if not os.path.isdir(root):
                     raise ValueError(f"--allow-root path must be an existing directory: {root}")
                 validated_roots.append(os.path.realpath(root))
-        else:
-            # This case is handled by argparse `required=True`
-            pass 
         self.allowed_roots = validated_roots
 
-        # Validate max cell sizes
         if args.max_cell_source_size < 0:
             raise ValueError(f"--max-cell-source-size must be non-negative: {args.max_cell_source_size}")
         self.max_cell_source_size = args.max_cell_source_size
@@ -133,9 +123,10 @@ class ServerConfig:
 
 # --- Argument Parsing ---
 def parse_arguments() -> argparse.Namespace:
+    # Argument parser setup remains the same as before
     parser = argparse.ArgumentParser(
         description="Jupyter Notebook MCP Server",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter # Show defaults in help
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
         '--allow-root',
@@ -195,93 +186,64 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     args = parser.parse_args()
-
-    # Convert log level string to logging constant
     args.log_level_int = getattr(logging, args.log_level.upper())
-
-    # Validate log_dir path type before passing to setup_logging
     if os.path.exists(args.log_dir) and not os.path.isdir(args.log_dir):
-         # Use parser.error for consistency in handling arg errors
          parser.error(f"--log-dir must be a directory path, not a file: {args.log_dir}")
-
     return args
 
-# --- Main Execution ---
+# --- Main Execution Function (called by script entry point) ---
 def main():
     """Parses arguments, sets up logging, initializes MCP, and runs the server."""
     args = None
     config = None
-    logger = None # Define logger here for access in finally block if needed
+    logger = None
 
     try:
         args = parse_arguments()
         config = ServerConfig(args)
     except (SystemExit, ValueError) as e:
-        # Catch errors from argparse or ServerConfig validation
         print(f"ERROR: Configuration failed: {e}", file=sys.stderr)
-        # SystemExit from argparse already includes exit code
         sys.exit(e.code if isinstance(e, SystemExit) else 1)
     except Exception as e:
         print(f"CRITICAL: Failed during argument parsing or validation: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Setup Logging (can now safely use config)
     try:
         setup_logging(config.log_dir, config.log_level)
-        # Get logger for this specific module after setup
-        logger = logging.getLogger(__name__) 
+        logger = logging.getLogger(__name__) # Get logger for this module (cursor_notebook_mcp.server)
     except Exception as e:
-        # Catch errors during logging setup itself
         print(f"CRITICAL: Failed during logging setup: {e}", file=sys.stderr)
-        # Fallback logging just in case setup failed partially
         logging.basicConfig(level=logging.ERROR)
         logging.exception("Logging setup failed critically")
         sys.exit(1)
 
-    logger.info(f"Notebook MCP Server starting (Version: {config.version})")
+    logger.info(f"Notebook MCP Server starting (Version: {config.version}) - via {__name__}")
     logger.info(f"Allowed Roots: {config.allowed_roots}")
     logger.info(f"Transport Mode: {config.transport}")
     if config.transport == 'sse':
         logger.info(f"SSE Endpoint: http://{config.host}:{config.port}")
     logger.debug(f"Full configuration: {config.__dict__}")
 
-    # --- Initialize MCP Server and Tools ---
     try:
         mcp_server = FastMCP("notebook_mcp")
-        
-        # Instantiate the tool provider, passing config and MCP instance.
-        # This automatically registers the tools via NotebookTools.__init__
         tool_provider = NotebookTools(config, mcp_server)
-        
-        # Tool registration happens within NotebookTools init
-        # We can potentially add a method to NotebookTools to return the list if needed,
-        # but for now, we'll assume registration was successful if no exceptions occurred.
         logger.info("Notebook tools initialized and registered.")
-        # Remove the placeholder ping tool if it existed
-        # if "ping" in mcp_server.tools:
-        #     del mcp_server.tools["ping"] 
-
     except Exception as e:
         logger.exception("Failed to initialize MCP server or tools.")
         sys.exit(1)
 
-    # --- Start Server based on Transport ---
     try:
         if config.transport == 'stdio':
             logger.info("Running server via stdio...")
-            # FastMCP handles the stdio loop internally
             mcp_server.run(transport='stdio')
             logger.info("Server finished (stdio).")
         
         elif config.transport == 'sse':
             logger.info(f"Running server via SSE...")
             try:
-                # Call the SSE runner function from the dedicated module
                 run_sse_server(mcp_server, config)
             except ImportError as e:
                 logger.error(f"Failed to start SSE server due to missing packages: {e}")
-                # The error message from run_sse_server is usually informative enough
-                # print(f"ERROR: {e}", file=sys.stderr)
                 sys.exit(1)
             except Exception as e:
                 logger.exception("Failed to start or run SSE server.")
@@ -289,14 +251,14 @@ def main():
             logger.info("Server finished (SSE).")
             
         else:
-            # This case should be prevented by argparse choices
             logger.error(f"Internal Error: Invalid transport specified: {config.transport}")
             sys.exit(1)
             
     except Exception as e:
-        # Catch errors during the mcp_server.run() or run_sse_server() execution
         logger.exception("Server encountered a fatal error during execution.")
         sys.exit(1)
 
+# If this script is run directly (e.g., python -m cursor_notebook_mcp.server)
 if __name__ == "__main__":
+    print("Running server module directly...") 
     main() 
