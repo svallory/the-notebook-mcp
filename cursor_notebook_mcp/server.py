@@ -11,6 +11,7 @@ import os
 import argparse
 from typing import Any, List, Dict
 import logging
+import re # Import re for the filter
 
 # --- Package-Internal Imports ---
 # Ensure these succeed when running as part of the package
@@ -36,6 +37,20 @@ except ImportError as e:
 # --- Logging Setup ---
 DEFAULT_LOG_DIR = os.path.expanduser("~/.cursor_notebook_mcp")
 DEFAULT_LOG_LEVEL = logging.INFO
+
+# Define the custom filter
+class TraitletsValidationFilter(logging.Filter):
+    """Filters out specific 'Additional properties are not allowed ('id' was unexpected)' errors from traitlets."""
+    # Pre-compile regex for efficiency
+    _pattern = re.compile(r"Notebook JSON is invalid: Additional properties are not allowed \('id' was unexpected\)")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False to suppress the log record, True otherwise."""
+        if record.name == 'traitlets' and record.levelno == logging.ERROR:
+            # Check if the message matches the specific pattern we want to suppress
+            if self._pattern.search(record.getMessage()):
+                return False # Suppress this specific log message
+        return True # Allow all other messages
 
 def setup_logging(log_dir: str, log_level: int):
     """Configures the root logger based on provided parameters."""
@@ -76,6 +91,19 @@ def setup_logging(log_dir: str, log_level: int):
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
+    # Apply the custom filter to the traitlets logger
+    traitlets_logger = logging.getLogger('traitlets')
+    # Ensure the logger's level isn't preventing ERRORs from reaching the filter
+    # If the root logger level is INFO or DEBUG, this is fine.
+    # If root is WARNING or higher, traitlets ERRORs might still be suppressed globally.
+    # For robustness, ensure traitlets can process ERRORs for filtering:
+    if traitlets_logger.level == 0 or traitlets_logger.level > logging.ERROR: # Check if level is NOTSET or higher than ERROR
+         # If the logger's own level is restrictive, set it just enough to allow ERRORs
+         # Note: This might slightly change behavior if it previously inherited a level > ERROR
+         traitlets_logger.setLevel(logging.ERROR)
+
+    traitlets_logger.addFilter(TraitletsValidationFilter())
+
     # Use root logger for initial messages
     initial_message = f"Logging initialized. Level: {logging.getLevelName(log_level)}."
     if log_file:
@@ -94,7 +122,7 @@ class ServerConfig:
     transport: str
     host: str
     port: int
-    version: str = "0.2.0" # Example version, could be dynamic
+    version: str = "0.2.2" # Dynamic version injected at build time or read from __init__
 
     def __init__(self, args: argparse.Namespace):
         self.log_dir = args.log_dir

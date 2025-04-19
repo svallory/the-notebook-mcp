@@ -13,6 +13,10 @@ Although designed to overcome a limitation with Cursor, this MCP server does not
 
 This MCP server uses the `nbformat` library to safely manipulate notebook structures and enforces security by restricting operations to user-defined directories. It also uses `nbconvert` to enable exporting notebooks to various formats like Python scripts, HTML, and more. The server handles all notebook operations through a clean API that maintains notebook integrity and prevents malformed changes.
 
+## Latest Version
+
+**Current Version:** `0.2.2` - See the [CHANGELOG.md](CHANGELOG.md) for details on recent changes.
+
 ## Features
 
 Exposes the following MCP tools (registered under the `notebook_mcp` server):
@@ -169,6 +173,25 @@ Run the server manually first (see "Running the Server" above), then tell Cursor
 ```
 
 **Note**: When using SSE transport, make sure the server is started *before* attempting to use it in Cursor.
+
+### Suggested Cursor Rules
+
+For smooth collaboration with the AI agent on Jupyter Notebooks, you might want to add rules like these to your Cursor configuration. Go to Cursor Settings > Rules and add them in either User Roles or Project Rules. This ensures that Cursor's AI features will consistently follow these best practices when working with Jupyter notebooks.
+
+```markdown 
+**Jupyter Notebook Rules for Cursor:**
+
+1.  **Tool Usage:** Use ONLY `notebook_mcp` tools for all notebook/cell operations. NEVER use `edit_file` on `.ipynb` files.
+2.  **Math Notation:** For LaTeX in Markdown cells, use `$ ... $` for inline math and `$$ ... $$` for display math. Avoid `\( ... \)` and `\[ ... \]`.
+3.  **Cell Magics:**
+    *   Avoid unsupported cell magics like `%%bash`, `%%timeit`, and `%%writefile`.
+    *   Use `!command` for shell commands instead of `%%bash`.
+    *   Use `%timeit` (line magic) for timing single statements.
+    *   `%%html` works for rendering HTML output.
+    *   `%%javascript` can execute (e.g., `alert`), but avoid relying on it for manipulating cell output display.
+4.  **Rich Outputs:** Matplotlib, Pandas DataFrames, Plotly, ipywidgets (`tqdm.notebook`), and embedded HTML in Markdown generally render correctly.
+5.  **Mermaid:** Diagrams in ` ```mermaid ``` ` blocks are not rendered by default.
+```
 
 ## Command-Line Arguments
 
