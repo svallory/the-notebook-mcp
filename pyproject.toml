@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 name = "cursor-notebook-mcp"
 version = "0.2.0"
 authors = [
-  { name="Cursor Team", email="team@cursor.so" },
+  { name="Jim Beno", email="jim@jimbeno.net" },
 ]
-description = "Minimal Cursor Protocol (MCP) implementation for Jupyter notebooks"
+description = "Model Context Protocol (MCP) implementation for Jupyter notebooks to overcome limitation with Cursor"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -38,8 +38,8 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://cursor.sh"
-"Bug Tracker" = "https://github.com/getcursor/cursor-notebook-mcp/issues"
+"Homepage" = "https://github.com/jbeno/cursor-notebook-mcp"
+"Bug Tracker" = "https://github.com/jbeno/cursor-notebook-mcp/issues"
 
 [project.scripts]
 cursor-notebook-mcp = "notebook_mcp_server:main"
