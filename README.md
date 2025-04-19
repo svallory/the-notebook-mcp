@@ -128,28 +128,58 @@ cursor-notebook-mcp --transport sse --allow-root /path/to/notebooks --host 127.0
 
 To make Cursor aware of this server, configure it in `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-specific).
 
+**Recommendation: Use SSE Transport**
+
+While both `stdio` and `sse` transport modes are supported, **using SSE is generally recommended** for integration with Cursor. 
+
+*   **Simpler Configuration:** The `mcp.json` setup only requires the server's URL.
+*   **Avoids Environment Issues:** Since you run the server process manually in its own terminal with its virtual environment activated, you avoid potential conflicts or complications related to Cursor launching the server process directly using `stdio` and ensuring the correct Python environment and packages are used.
+
+See the sections below for configuring each transport type.
+
 ### For stdio Transport
 
-Cursor launches and manages the server. Use the installed script path or direct python execution:
+If you choose to use `stdio` (where Cursor launches and manages the server process), you need to tell Cursor how to start the server using the `command` and `args` fields. **Care must be taken to ensure Cursor uses the correct Python environment containing this package and its dependencies.** There are two primary ways to configure the `command`:
+
+1.  **Use the installed script (Simplest `stdio` method):** Point `command` to the `cursor-notebook-mcp` script located in your virtual environment's `bin` directory (e.g., `.venv/bin/cursor-notebook-mcp`). This requires installing the package first.
+2.  **Use direct Python execution:** Set `command` to the path of the Python interpreter in your virtual environment (e.g., `.venv/bin/python`). Then, the *first* item in the `args` list must be the absolute path to the server script within the project (e.g., `/path/to/project/cursor_notebook_mcp/server.py`).
+
+**Troubleshooting `stdio` Environment Issues:**
+
+If the server fails to start or cannot find dependencies when using `stdio`, it likely means Cursor is not launching the process with the correct virtual environment activated. A common workaround is to:
+
+1.  Activate your virtual environment manually in your terminal (`source .venv/bin/activate`).
+2.  Launch Cursor *from that same terminal* by navigating to your project directory and running `cursor .`.
+
+This ensures Cursor inherits the activated environment, which should then be passed down to the `stdio` server process it launches.
+
+**Example (using installed script method):**
+
+Make sure to replace `/absolute/path/to/venv/bin/cursor-notebook-mcp` and `/absolute/path/to/your/notebooks` with the correct paths for your system.
 
 ```json
 {
   "mcpServers": {
-    "notebook_mcp": { // Use the correct server name
-      // Option 1: Use installed script (ensure venv path is correct)
-      "command": "/absolute/path/to/venv/bin/cursor-notebook-mcp", 
-      // Option 2: Use python and script path
-      // "command": "/absolute/path/to/venv/bin/python", 
-      // "args": ["/absolute/path/to/project/notebook_mcp_server.py", ... ],
+    "notebook_mcp": {
+      "command": "/absolute/path/to/venv/bin/cursor-notebook-mcp",
       "args": [
-        "--allow-root", "/absolute/path/to/your/notebooks",
-        // Optional logging arguments:
-        // "--log-dir", "/path/to/your/desired/log/directory",
-        // "--log-level", "DEBUG"
-      ],
-      "env": { 
-        // Add environment variables if needed
-      }
+        "--allow-root", "/absolute/path/to/your/notebooks"
+      ]
+    }
+  }
+}
+```
+
+*(Note: If using direct Python execution, modify the `command` and `args` like this):*
+```json
+{
+  "mcpServers": {
+    "notebook_mcp": {
+      "command": "/absolute/path/to/venv/bin/python",
+      "args": [
+        "/absolute/path/to/project/cursor_notebook_mcp/server.py", 
+        "--allow-root", "/absolute/path/to/your/notebooks"
+      ]
     }
   }
 }
@@ -157,16 +187,13 @@ Cursor launches and manages the server. Use the installed script path or direct 
 
 ### For SSE Transport
 
-Run the server manually first (see "Running the Server" above), then tell Cursor where to connect:
+When using `sse`, you must run the server process manually first (see "Running the Server" section). Then, configure Cursor to connect to the running server's URL.
 
 ```json
 {
   "mcpServers": {
-    "notebook_mcp": { // Use the correct server name
-      "url": "http://localhost:8080/sse",
-      "env": { 
-        // Add environment variables if needed
-      }
+    "notebook_mcp": {
+      "url": "http://127.0.0.1:8080/sse"
     }
   }
 }
