@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cursor-notebook-mcp"
+version = "0.2.0"
+authors = [
+  { name="Cursor Team", email="team@cursor.so" },
+]
+description = "Minimal Cursor Protocol (MCP) implementation for Jupyter notebooks"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "mcp>=0.1.0",
+    "nbformat>=5.0",
+    "nbconvert>=6.0",
+    "ipython",
+    "jupyter_core",
+]
+
+[project.optional-dependencies]
+sse = [
+    "uvicorn>=0.20.0",
+    "starlette>=0.25.0"
+]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.18"
+]
+dev = [
+    "cursor-notebook-mcp[sse,test]"
+]
+
+[project.urls]
+"Homepage" = "https://cursor.sh"
+"Bug Tracker" = "https://github.com/getcursor/cursor-notebook-mcp/issues"
+
+[project.scripts]
+cursor-notebook-mcp = "notebook_mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cursor_notebook_mcp"]

@@ -1,0 +1,40 @@
+[Unit]
+Description=Cursor Notebook MCP Server (SSE Mode)
+After=network.target
+
+[Service]
+Type=simple
+# IMPORTANT: Replace with the actual user/group to run the service as
+User=youruser 
+Group=yourgroup
+
+# Set WorkingDirectory if needed, e.g., if the server relies on relative paths (it shouldn't)
+# WorkingDirectory=/path/to/project
+
+# --- Choose ONE ExecStart option below --- 
+
+# Option 1: Use direct path to the installed script in venv (Recommended if installed)
+# Replace /path/to/venv and /path/to/notebooks
+ExecStart=/path/to/venv/bin/cursor-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
+
+# Option 2: Use direct path to Python and the source script
+# Replace /path/to/venv, /path/to/project, and /path/to/notebooks
+# ExecStart=/path/to/venv/bin/python /path/to/project/notebook_mcp_server.py --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
+
+# Option 3: Use bash to source the environment first (Less common)
+# Replace /path/to/venv and /path/to/notebooks
+# ExecStart=/bin/bash -c 'source /path/to/venv/bin/activate && cursor-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks'
+
+# Recommended: Set restart policy
+Restart=on-failure
+RestartSec=5
+
+# Ensure output is not buffered (good for logging)
+Environment=PYTHONUNBUFFERED=1 
+
+# Optional: Redirect stdout/stderr to syslog or journald (systemd default)
+# StandardOutput=journal
+# StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 
