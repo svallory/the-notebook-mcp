@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Several issues in SSE transport (`sse_transport.py`) related to refactoring, including incorrect `SseServerTransport` initialization, missing `/messages` route handling, and incorrect parameters passed to the underlying `mcp.server.Server.run` method, causing connection failures.
 - GitHub Actions CI workflow failure (exit code 127) by switching dependency installation from `uv` to standard `pip` to ensure `pytest` is found.
 - Hanging test (`test_sse_route_connection` in `tests/test_sse_transport.py`) by refactoring to call the handler directly with a mock request instead of using `TestClient`.
+- CI test failure (`test_read_large_notebook_truncated`) by enabling Git LFS (`lfs: true`) in the `actions/checkout` step to correctly download large fixture files.
 
 ## [0.2.2] - 2025-04-19
 
