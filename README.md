@@ -242,9 +242,66 @@ For smooth collaboration with the AI agent on Jupyter Notebooks, you might want 
     *   Ask the user for clarification only if the necessary information cannot be determined after using the investigation tools.
 
 3.  **Available Tools:**
-    *   Be aware of the different categories of tools: File operations (`create`, `delete`, `rename`), Notebook/Cell Reading (`read`, `read_cell`, `get_cell_count`, `get_info`), Cell Manipulation (`add_cell`, `edit_cell`, `delete_cell`, `move_cell`, `change_cell_type`, `duplicate_cell`, `split_cell`, `merge_cells`), Metadata (`read/edit_metadata`, `read/edit_cell_metadata`), Outputs (`read_cell_output`, `clear_cell_outputs`, `clear_all_outputs`), and Utility (`
+    *   Be aware of the different categories of tools: File operations (`create`, `delete`, `rename`), Notebook/Cell Reading (`read`, `read_cell`, `get_cell_count`, `get_info`), Cell Manipulation (`add_cell`, `edit_cell`, `delete_cell`, `move_cell`, `change_cell_type`, `duplicate_cell`, `split_cell`, `merge_cells`), Metadata (`read/edit_metadata`, `read/edit_cell_metadata`), Outputs (`read_cell_output`, `clear_cell_outputs`, `clear_all_outputs`), and Utility (`validate`, `export`, `diagnose_imports`).
+
+4.  **Math Notation:** For LaTeX in Markdown cells, use `$ ... $` for inline math and `$$ ... $$` for display math. Avoid `\( ... \)` and `\[ ... \]`.
+
+5.  **Cell Magics:**
+    *   Avoid unsupported cell magics like `%%bash`, `%%timeit`, and `%%writefile`.
+    *   Use `!command` for shell commands instead of `%%bash`.
+    *   Use `%timeit` (line magic) for timing single statements.
+    *   `%%html` works for rendering HTML output.
+    *   `%%javascript` can execute (e.g., `alert`), but avoid relying on it for manipulating cell output display.
+
+6.  **Rich Outputs:** Matplotlib, Pandas DataFrames, Plotly, ipywidgets (`tqdm.notebook`), and embedded HTML in Markdown generally render correctly.
+
+7.  **Mermaid:** Diagrams in ` ```mermaid ``` ` blocks are not rendered by default.
+
+8.  **Character Escaping in `source` Parameter:**
+    *   When providing the `source` string for `add_cell` or `edit_cell`, ensure that backslashes (`\`) are handled correctly. Newline characters **must** be represented as `\n` (not `\\n`), and LaTeX commands **must** use single backslashes (e.g., `\Sigma`, not `\\Sigma`).
+    *   Incorrect escaping by the tool or its interpretation can break Markdown formatting (like paragraphs intended to be separated by `\n\n`) and LaTeX rendering.
+    *   After adding or editing cells with complex strings (especially those involving newlines or LaTeX), consider using `read_cell` to verify the content was saved exactly as intended and correct if necessary.
 ```
 
+## Command-Line Arguments
+
+The server accepts the following command-line arguments:
+
+*   `--allow-root`: (Required, can use multiple times) Absolute path to directory where notebooks are allowed.
+*   `--log-dir`: Directory to store log files. Defaults to `~/.cursor_notebook_mcp`.
+*   `--log-level`: Set the logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. Defaults to `INFO`.
+*   `--max-cell-source-size`: Maximum allowed size in bytes for cell source content. Defaults to 10 MiB.
+*   `--max-cell-output-size`: Maximum allowed size in bytes for cell output content. Defaults to 10 MiB.
+*   `--transport`: Transport type to use: `stdio` or `sse`. Defaults to `stdio`.
+*   `--host`: Host to bind the SSE server to. Only used with `--transport=sse`. Defaults to `127.0.0.1`.
+*   `--port`: Port to bind the SSE server to. Only used with `--transport=sse`. Defaults to `8080`.
+
+## Security
+
+*   **Workspace Root Enforcement:** The server **requires** the `--allow-root` command-line argument during startup. It will refuse to operate on any notebook file located outside the directories specified by these arguments. This is a critical security boundary.
+*   **Path Handling:** The server uses `os.path.realpath` to resolve paths and checks against the allowed roots before any read or write operation.
+*   **Input Validation:** Basic checks for `.ipynb` extension are performed.
+*   **Cell Source Size Limit:** The server enforces a maximum size limit (configurable via `--max-cell-source-size`, default 10 MiB) on the source content provided to `notebook_edit_cell` and `notebook_add_cell` to prevent excessive memory usage.
+*   **Cell Output Size Limit:** The server enforces a maximum size limit (configurable via `--max-cell-output-size`, default 10 MiB) on the total serialized size of outputs returned by `notebook_read_cell_output`.
+
+## Limitations
+
+*   **No Cell Execution:** This server **cannot execute** notebook cells. It operates solely on the `.ipynb` file structure using the `nbformat` library and does not interact with Jupyter kernels. Cell execution must be performed manually by the user within the Cursor UI (selecting the desired kernel and running the cell). Implementing execution capabilities in this server would require kernel management and introduce significant complexity and security considerations.
+
+## Known Issues
+
+*   **UI Refresh Issues:** Occasionally, some notebook operations (like cell splitting or merging) may succeed at the file level, but the Cursor UI might not show the updated content correctly. In such situations, you can:
+    * Close and re-open the notebook file
+    * Save the file, which might prompt to "Revert" or "Overwrite" - select "Revert" to reload the actual file content
+
+## Development & Testing
+
+1. Setup virtual environment and install dev dependencies:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -e ".[dev]"
+   ```
 2. Run tests:
    ```bash
    # Use the wrapper script to ensure environment variables are set
@@ -254,3 +311,44 @@ For smooth collaboration with the AI agent on Jupyter Notebooks, you might want 
    ```
 
 ## Issues
+
+If you encounter any bugs or issues, please submit them to our GitHub issue tracker:
+
+1. Visit [jbeno/cursor-notebook-mcp](https://github.com/jbeno/cursor-notebook-mcp/issues)
+2. Click on "New Issue"
+3. Provide:
+   - A clear description of the problem
+   - Steps to reproduce the issue
+   - Expected vs actual behavior
+   - Your environment details (OS, Python version, etc.)
+   - Any relevant error messages or logs
+   - Which model and client/version you're using
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a new branch for your feature (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests to ensure nothing is broken (`pytest tests/`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to your branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+Please make sure your PR:
+- Includes tests for new functionality
+- Updates documentation as needed
+- Follows the existing code style
+- Includes a clear description of the changes
+
+For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+
+## Author
+
+This project was created and is maintained by Jim Beno - jim@jimbeno.net

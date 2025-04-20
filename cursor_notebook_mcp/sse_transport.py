@@ -40,13 +40,15 @@ if TYPE_CHECKING:
 async def handle_sse(request):
     """Handles incoming SSE connections and delegates to MCP transport."""
     mcp_server = request.app.state.mcp_server
+    # Retrieve the shared transport instance
+    transport = request.app.state.sse_transport 
     config = request.app.state.config
     client_host = request.client.host
     client_port = request.client.port
     log_prefix = f"[SSE {client_host}:{client_port}]"
     logger.info(f"{log_prefix} New SSE connection request from {client_host}:{client_port}")
 
-    transport = SseServerTransport()
+    # transport = SseServerTransport(endpoint=mcp_server) # Old incorrect line
     try:
         logger.debug(f"{log_prefix} Setting up SSE connection")
         # connect_sse handles the SSE handshake and provides streams
@@ -55,11 +57,18 @@ async def handle_sse(request):
         ) as streams:
             read_stream, write_stream = streams
             logger.info(f"{log_prefix} Connection established. Running MCP session.")
-            # Run the MCP server logic using the established streams
-            await mcp_server._mcp_server.run(
-                transport='stream', 
-                read_stream=read_stream, 
-                write_stream=write_stream
+            
+            # Get the underlying server instance that has the necessary methods
+            underlying_server = mcp_server._mcp_server
+            
+            # Create options using the underlying server instance
+            init_options = underlying_server.create_initialization_options()
+            
+            # Call run() on the underlying server instance, passing streams and options
+            await underlying_server.run(
+                read_stream=streams[0], 
+                write_stream=streams[1],
+                initialization_options=init_options
             )
             logger.info(f"{log_prefix} MCP session finished.")
     except Exception as e:
@@ -94,9 +103,14 @@ exception_handlers = {
 # Function to create the Starlette app (refactored)
 def create_starlette_app(mcp_server: FastMCP, config: 'ServerConfig') -> Starlette:
     """Creates the Starlette application instance."""
+    # Create the SSE transport instance once, passing the **correct** endpoint path
+    # This is the path the client will be instructed to POST messages back to.
+    transport = SseServerTransport(endpoint="/messages/")
+    
     routes = [
-        Route("/", endpoint=handle_root, methods=["GET"]),
-        Route("/sse", endpoint=handle_sse) # Default methods handled by SSE transport
+        Route("/", endpoint=handle_root, methods=["GET"]), # Root info
+        Route("/sse", endpoint=handle_sse), # Initial SSE connection (GET)
+        Mount("/messages", app=transport.handle_post_message) # Client message handler (POST)
     ]
     middleware = [
         Middleware(ServerErrorMiddleware, handler=generic_exception_handler)
@@ -111,6 +125,7 @@ def create_starlette_app(mcp_server: FastMCP, config: 'ServerConfig') -> Starlet
     # Store shared instances in app state
     app.state.mcp_server = mcp_server
     app.state.config = config
+    app.state.sse_transport = transport # Store the transport instance
     return app
 
 
@@ -140,56 +155,4 @@ def run_sse_server(mcp_server: FastMCP, config: 'ServerConfig'):
         raise # Re-raise for main server loop to catch
     except Exception as e:
         logger.exception(f"Failed to start or run Uvicorn server: {e}")
-        raise # Re-raise for main server loop to catch
-
-    async def health_endpoint(request):
-        """Simple health check endpoint."""
-        return JSONResponse({
-            "status": "ok",
-            "service": "Jupyter Notebook MCP Server",
-            "version": config.version,
-            "transport": "sse"
-        })
-
-    async def info_endpoint(request):
-        """Provides basic server information."""
-        return JSONResponse({
-            "name": "Jupyter Notebook MCP Server",
-            "version": config.version,
-            "transport": "sse",
-            "allowed_roots": config.allowed_roots,
-            # Add other relevant config details if needed
-        })
-
-    # Define Starlette routes
-    routes = [
-        Route("/sse", endpoint=handle_sse), # SSE connection endpoint
-        Route("/health", endpoint=health_endpoint), # Health check
-        Route("/", endpoint=info_endpoint),       # Basic info
-        Mount("/messages", app=transport.handle_post_message), # Endpoint for clients to POST messages
-    ]
-
-    # Create Starlette app
-    app = Starlette(routes=routes, debug=config.log_level <= logging.DEBUG)
-
-    logger.info(f"Starting Uvicorn server on http://{config.host}:{config.port}")
-    
-    # Configure Uvicorn logging based on server log level
-    log_config = uvicorn.config.LOGGING_CONFIG
-    log_config["loggers"]["uvicorn"]["level"] = logging.getLevelName(config.log_level)
-    log_config["loggers"]["uvicorn.error"]["level"] = logging.getLevelName(config.log_level)
-    log_config["loggers"]["uvicorn.access"]["level"] = logging.getLevelName(config.log_level)
-    # Disable access logs propagation if too noisy at DEBUG level
-    log_config["loggers"]["uvicorn.access"]["propagate"] = config.log_level > logging.DEBUG 
-
-    try:
-        # Run the Uvicorn server
-        uvicorn.run(
-            app, 
-            host=config.host, 
-            port=config.port, 
-            log_config=log_config
-        )
-    except Exception as e:
-        logger.exception(f"Uvicorn server failed to run: {e}")
-        raise # Re-raise the exception to be caught by the main loop 
+        raise # Re-raise for main server loop to catch 

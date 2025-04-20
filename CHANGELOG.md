@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug in `notebook_read` size estimation loop (`NameError: name 'i' is not defined`).
 - Multiple test failures related to incorrect mocking, error expectations, path handling, test setup, and imports (`StringIO`, `FastMCP`).
 - Invalid escape sequence in `pyproject.toml` coverage exclusion pattern.
+- Several issues in SSE transport (`sse_transport.py`) related to refactoring, including incorrect `SseServerTransport` initialization, missing `/messages` route handling, and incorrect parameters passed to the underlying `mcp.server.Server.run` method, causing connection failures.
 
 ## [0.2.2] - 2025-04-19
 
