@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Model Context Protocol (MCP) implementation for Jupyter notebooks to overcome limitation with Cursor"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = ["jupyter", "notebook", "mcp", "cursor", "ai", "agent", "nbformat", "ipynb"]
 classifiers = [
