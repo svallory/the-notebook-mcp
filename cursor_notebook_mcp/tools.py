@@ -915,7 +915,7 @@ class NotebookTools:
             total_size = 0
             MAX_TOTAL_SIZE = 50 * 1024 * 1024 # Example: Limit total read size to 50MB
             
-            for cell in nb_dict.get('cells', []):
+            for i, cell in enumerate(nb_dict.get('cells', [])):
                 try:
                     cell_bytes = json.dumps(cell).encode('utf-8')
                     cell_size = len(cell_bytes)

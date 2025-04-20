@@ -122,7 +122,7 @@ class ServerConfig:
     transport: str
     host: str
     port: int
-    version: str = "0.2.2" # Dynamic version injected at build time or read from __init__
+    version: str = "0.2.3" # Dynamic version injected at build time or read from __init__
 
     def __init__(self, args: argparse.Namespace):
         self.log_dir = args.log_dir

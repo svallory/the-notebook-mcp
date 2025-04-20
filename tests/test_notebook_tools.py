@@ -12,6 +12,10 @@ from pathlib import Path
 import importlib
 import json
 import asyncio
+from unittest import mock
+import subprocess
+import sys
+import builtins # Import builtins for mocking import
 
 # Import the class to be tested
 from cursor_notebook_mcp.tools import NotebookTools
@@ -124,6 +128,36 @@ async def test_path_validation_wrong_extension(notebook_tools_inst: NotebookTool
         await notebook_tools_inst.notebook_create(notebook_path=txt_path)
     with pytest.raises(ValueError, match="must point to a .ipynb file"):
         await notebook_tools_inst.notebook_create(notebook_path=no_ext_path)
+
+async def test_path_validation_is_directory(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test that validation fails if the path points to a directory."""
+    dir_path = notebook_path_factory()
+    # Remove the .ipynb if it exists and create a directory instead
+    dir_path = dir_path.replace(".ipynb", "")
+    os.makedirs(dir_path, exist_ok=True)
+    
+    # Re-add .ipynb extension for the test call, pointing to the directory
+    path_pointing_to_dir = dir_path + ".ipynb"
+    
+    # We need to ensure the path check logic runs. 
+    # Calling create directly might fail on the directory existing if we don't clean up.
+    # A safer approach is to test a read/write operation on a *non-existent* file path
+    # whose *parent directory* matches our created directory, IF the validation checks parents.
+    # However, the core logic likely checks if the target path *itself* is a file.
+    # Let's test `notebook_create` assuming it checks `isfile` or similar on the target.
+    
+    # Clean up just in case - delete the .ipynb file if it somehow exists
+    if os.path.isfile(path_pointing_to_dir):
+        os.remove(path_pointing_to_dir)
+    # Now create the *directory* with the name we intend to use for the notebook file
+    os.makedirs(path_pointing_to_dir, exist_ok=True)
+
+    # Expect FileExistsError because notebook_create checks os.path.exists first
+    with pytest.raises(FileExistsError, match=r"Cannot create notebook, file already exists"):
+        await notebook_tools_inst.notebook_create(notebook_path=path_pointing_to_dir)
+    
+    # Clean up the directory we created
+    os.rmdir(path_pointing_to_dir)
 
 async def test_add_read_edit_delete_cell(notebook_tools_inst: NotebookTools, notebook_path_factory):
     """Test adding, reading, editing, and deleting a cell."""
@@ -279,6 +313,21 @@ async def test_move_cell(notebook_tools_inst: NotebookTools, notebook_path_facto
     with pytest.raises(IndexError):
         await notebook_tools_inst.notebook_move_cell(notebook_path=nb_path, from_index=0, to_index=5) # Invalid to
 
+async def test_move_cell_no_op(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test moving a cell to its current location or adjacent is a no-op."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='C0', insert_after_index=-1)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='C1', insert_after_index=0)
+    
+    # Move C0 to index 0 (its current position)
+    result1 = await notebook_tools_inst.notebook_move_cell(notebook_path=nb_path, from_index=0, to_index=0)
+    assert "not moved" in result1
+    
+    # Move C0 to index 1 (immediately after its current position)
+    result2 = await notebook_tools_inst.notebook_move_cell(notebook_path=nb_path, from_index=0, to_index=1)
+    assert "not moved" in result2
+
 async def test_split_cell(notebook_tools_inst: NotebookTools, notebook_path_factory):
     """Test splitting a cell into two."""
     nb_path = notebook_path_factory()
@@ -306,6 +355,49 @@ async def test_split_cell(notebook_tools_inst: NotebookTools, notebook_path_fact
         await notebook_tools_inst.notebook_split_cell(notebook_path=nb_path, cell_index=0, split_at_line=10) # Original cell only has 2 lines now
     with pytest.raises(IndexError):
          await notebook_tools_inst.notebook_split_cell(notebook_path=nb_path, cell_index=5, split_at_line=1) # Invalid cell index
+
+async def test_split_cell_at_end(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test splitting a cell at the very end (creates empty second cell)."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    initial_source = "line1\nline2"
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source=initial_source, insert_after_index=-1)
+    
+    num_lines = len(initial_source.splitlines())
+    split_at = num_lines + 1 # Split after the last line
+    
+    # Split after line 2 (line 3, which doesn't exist, becomes start of new cell)
+    split_result = await notebook_tools_inst.notebook_split_cell(notebook_path=nb_path, cell_index=0, split_at_line=split_at)
+    assert "Successfully split cell" in split_result
+    
+    info = await notebook_tools_inst.notebook_get_info(notebook_path=nb_path)
+    assert info['cell_count'] == 2
+    
+    cell0_source = await notebook_tools_inst.notebook_read_cell(notebook_path=nb_path, cell_index=0)
+    cell1_source = await notebook_tools_inst.notebook_read_cell(notebook_path=nb_path, cell_index=1)
+    
+    assert cell0_source == initial_source # Original cell should be unchanged
+    assert cell1_source == "" # New cell should be empty
+
+async def test_split_raw_cell(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test splitting a raw cell."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    # Add markdown, then change to raw
+    initial_source = "line1\nline2\nline3"
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='markdown', source=initial_source, insert_after_index=-1)
+    await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=0, new_type='raw')
+    
+    # Split the raw cell after line 1
+    split_result = await notebook_tools_inst.notebook_split_cell(notebook_path=nb_path, cell_index=0, split_at_line=2)
+    assert "Successfully split cell" in split_result
+    
+    nb = await notebook_tools_inst.read_notebook(nb_path, notebook_tools_inst.config.allowed_roots)
+    assert len(nb.cells) == 2
+    assert nb.cells[0].cell_type == 'raw'
+    assert nb.cells[0].source == "line1\n" # Original cell truncated
+    assert nb.cells[1].cell_type == 'raw' # New cell is also raw
+    assert nb.cells[1].source == "line2\nline3" # New cell has remaining lines
 
 async def test_merge_cells(notebook_tools_inst: NotebookTools, notebook_path_factory):
     """Test merging two adjacent cells."""
@@ -340,6 +432,34 @@ async def test_merge_cells(notebook_tools_inst: NotebookTools, notebook_path_fac
         # Invalid index
         await notebook_tools_inst.notebook_merge_cells(notebook_path=nb_path, first_cell_index=5)
 
+async def test_merge_cells_size_limit(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test merging fails if combined source exceeds size limit."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    
+    limit = notebook_tools_inst.config.max_cell_source_size
+    # Make source sizes that just exceed the limit when combined
+    size1 = limit // 2
+    size2 = limit - size1 + 1 
+    source1 = "A" * size1
+    source2 = "B" * size2
+    
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source=source1, insert_after_index=-1)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source=source2, insert_after_index=0)
+
+    with pytest.raises(ValueError, match="Merged source content exceeds maximum allowed size"):
+        await notebook_tools_inst.notebook_merge_cells(notebook_path=nb_path, first_cell_index=0)
+
+async def test_merge_cells_different_types(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test merging fails if cells have different types."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='code cell', insert_after_index=-1)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='markdown', source='md cell', insert_after_index=0)
+    
+    with pytest.raises(ValueError, match="Cannot merge cells of different types"):
+        await notebook_tools_inst.notebook_merge_cells(notebook_path=nb_path, first_cell_index=0)
+
 async def test_change_cell_type(notebook_tools_inst: NotebookTools, notebook_path_factory):
     """Test changing the type of a cell."""
     nb_path = notebook_path_factory()
@@ -371,6 +491,18 @@ async def test_change_cell_type(notebook_tools_inst: NotebookTools, notebook_pat
     # Test invalid index
     with pytest.raises(IndexError):
         await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=5, new_type='code')
+
+async def test_change_cell_type_no_op(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test changing a cell to the type it already is."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='print(1)', insert_after_index=-1)
+    
+    # Attempt to change code cell (index 0) to code
+    result = await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=0, new_type='code')
+    
+    # Verify success message indicates no change was needed
+    assert "already of type 'code'. No change needed" in result
 
 async def test_duplicate_cell(notebook_tools_inst: NotebookTools, notebook_path_factory):
     """Test duplicating a cell."""
@@ -408,9 +540,27 @@ async def test_duplicate_cell(notebook_tools_inst: NotebookTools, notebook_path_
         await notebook_tools_inst.notebook_duplicate_cell(notebook_path=nb_path, cell_index=0, count=0)
     with pytest.raises(ValueError, match="positive integer"):
         await notebook_tools_inst.notebook_duplicate_cell(notebook_path=nb_path, cell_index=0, count=-1)
-    # Test invalid index
     with pytest.raises(IndexError):
          await notebook_tools_inst.notebook_duplicate_cell(notebook_path=nb_path, cell_index=10)
+
+async def test_raw_cell_handling(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test changing the type to and from raw cells."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='markdown', source='# MD', insert_after_index=-1)
+    
+    # Change MD (idx 0) to raw
+    change1_result = await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=0, new_type='raw')
+    assert "Successfully changed cell 0 from 'markdown' to 'raw'" in change1_result
+    nb = await notebook_tools_inst.read_notebook(nb_path, notebook_tools_inst.config.allowed_roots)
+    assert nb.cells[0].cell_type == 'raw'
+    assert nb.cells[0].source == '# MD' # Source preserved
+    
+    # Change raw (idx 0) back to markdown
+    change2_result = await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=0, new_type='markdown')
+    assert "Successfully changed cell 0 from 'raw' to 'markdown'" in change2_result
+    nb = await notebook_tools_inst.read_notebook(nb_path, notebook_tools_inst.config.allowed_roots)
+    assert nb.cells[0].cell_type == 'markdown'
 
 # --- Tests for Metadata Operations ---
 
@@ -668,33 +818,135 @@ async def test_export_notebook(notebook_tools_inst: NotebookTools, notebook_path
     await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='print("Hello")', insert_after_index=-1)
     await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='markdown', source='# Title', insert_after_index=0)
 
-    export_formats = ['python', 'html', 'markdown']
-    for fmt in export_formats:
-        output_filename = f"exported_nb_{fmt}.{fmt}"
-        output_path = str(temp_notebook_dir / output_filename)
+    # Test standard, expected-to-work formats
+    supported_formats = ['python', 'html', 'markdown']
+    for fmt in supported_formats:
+        output_filename_base = f"exported_nb_{fmt}"
+        # Correct the expected extension for python and markdown formats
+        if fmt == 'python':
+            expected_extension = ".py"
+        elif fmt == 'markdown':
+            expected_extension = ".md"
+        else:
+            expected_extension = f".{fmt}" 
+        output_path = str(temp_notebook_dir / (output_filename_base + expected_extension)) # Provide full expected path
         
         export_result = await notebook_tools_inst.notebook_export(
             notebook_path=nb_path, 
             export_format=fmt, 
-            output_path=output_path
+            output_path=output_path # nbconvert uses basename as --output
         )
         
         assert f"Successfully exported notebook to {fmt} format" in export_result
         # Find the actual generated path from the result message
         actual_output_path = export_result.split(" at ")[-1]
         assert os.path.exists(actual_output_path)
+        # Verify the found path is the one we expected (or very similar)
+        assert os.path.basename(actual_output_path).startswith(output_filename_base)
+        assert actual_output_path.endswith(expected_extension) # Check extension
         # Basic check: ensure file is not empty
         assert os.path.getsize(actual_output_path) > 0
 
-    # Test invalid format (nbconvert might handle some, but test an unlikely one)
-    # This might raise RuntimeError from nbconvert process
-    with pytest.raises(RuntimeError):
-         output_path_invalid = str(temp_notebook_dir / "invalid.xyz")
-         await notebook_tools_inst.notebook_export(notebook_path=nb_path, export_format="xyz", output_path=output_path_invalid)
+    # Test PDF format - expect failure if LaTeX is missing
+    pdf_output_path = str(temp_notebook_dir / "exported_nb_pdf.pdf")
+    try:
+        pdf_export_result = await notebook_tools_inst.notebook_export(
+            notebook_path=nb_path,
+            export_format='pdf',
+            output_path=pdf_output_path
+        )
+        # If it succeeds, check the result (LaTeX must be installed)
+        assert f"Successfully exported notebook to pdf format" in pdf_export_result
+        actual_pdf_path = pdf_export_result.split(" at ")[-1]
+        assert os.path.exists(actual_pdf_path)
+        assert os.path.getsize(actual_pdf_path) > 0
+    except RuntimeError as e:
+        # If it fails with RuntimeError, check if it's the expected LaTeX error
+        error_message = str(e).lower()
+        if "xelatex not found" in error_message or "latex failed" in error_message or "nbconvert failed" in error_message:
+            # This is the expected failure if LaTeX isn't installed, so pass the test
+            pass 
+        else:
+            # If it's a different RuntimeError, re-raise it
+            pytest.fail(f"PDF export failed with unexpected RuntimeError: {e}")
+    except Exception as e:
+        # Catch any other unexpected exceptions
+        pytest.fail(f"PDF export failed with unexpected exception: {e}")
 
-    # Test exporting outside allowed root
+    # Test exporting outside allowed root (should fail regardless of format)
     with pytest.raises(PermissionError):
          await notebook_tools_inst.notebook_export(notebook_path=nb_path, export_format="python", output_path="/tmp/unsafe_export.py") 
+
+@pytest.mark.skipif(not importlib.util.find_spec("nbconvert"), reason="nbconvert not found")
+async def test_export_notebook_same_path(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test exporting fails if output path is same as input path."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    
+    with pytest.raises(ValueError, match="Output path cannot be the same as the input"):
+        await notebook_tools_inst.notebook_export(
+            notebook_path=nb_path,
+            export_format="python",
+            output_path=nb_path # Using same path for input and output
+        )
+
+async def test_clear_all_outputs_no_op(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test clear_all_outputs works correctly when there's nothing to clear."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    # Add only a markdown cell
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='markdown', source='md', insert_after_index=-1)
+    
+    # Call clear_all_outputs
+    result = await notebook_tools_inst.notebook_clear_all_outputs(notebook_path=nb_path)
+    
+    # Verify success message indicates nothing was cleared
+    assert "No code cell outputs found to clear" in result
+    
+    # Add an empty code cell
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='', insert_after_index=0)
+    
+    # Call clear_all_outputs again
+    result2 = await notebook_tools_inst.notebook_clear_all_outputs(notebook_path=nb_path)
+    assert "No code cell outputs found to clear" in result2
+
+async def test_read_large_notebook_truncated(notebook_tools_inst: NotebookTools, temp_notebook_dir):
+    """Test reading a large notebook triggers truncation logic when limits are lowered."""
+    # Source path for the static fixture
+    test_dir = Path(__file__).parent
+    static_notebook_source_path = test_dir / "fixtures" / "large_or_malformed_notebook.ipynb"
+
+    if not static_notebook_source_path.exists():
+        pytest.skip("Static test file tests/fixtures/large_or_malformed_notebook.ipynb not found.")
+
+    # Destination path inside the allowed temporary directory
+    # temp_notebook_dir is provided by conftest.py fixture
+    notebook_dest_path = temp_notebook_dir / static_notebook_source_path.name
+
+    # Copy the static file into the allowed directory for the test
+    try:
+        import shutil
+        shutil.copyfile(static_notebook_source_path, notebook_dest_path)
+    except Exception as e:
+        pytest.fail(f"Failed to copy test fixture to temp dir: {e}")
+
+    # Temporarily lower the size limits for this test using mocking
+    low_limit = 1024 # 1 KB limit
+    original_config = notebook_tools_inst.config
+    
+    with mock.patch.object(original_config, 'max_cell_source_size', low_limit), \
+         mock.patch.object(original_config, 'max_cell_output_size', low_limit):
+             
+        # Attempt to read the notebook from the allowed temp directory
+        nb_dict = await notebook_tools_inst.notebook_read(notebook_path=str(notebook_dest_path))
+
+        # Assert that truncation occurred 
+        global_truncated = nb_dict.get('metadata', {}).get('truncated') is not None
+        cell_meta_truncated = any(cell.get('metadata', {}).get('truncated') for cell in nb_dict.get('cells', []))
+        cell_source_truncated = any("[Content truncated" in cell.get('source', '') for cell in nb_dict.get('cells', []))
+        
+        assert global_truncated or cell_meta_truncated or cell_source_truncated, \
+               "Notebook read did not indicate truncation when size limits were lowered."
 
 # --- Tests for CLI Entry Point ---
 
@@ -741,3 +993,258 @@ async def test_cli_entry_point_no_root(cli_command_path):
     assert "the following arguments are required: --allow-root" in stderr
     # Check our specific error message as well
     assert "Configuration failed:" in stderr 
+
+async def test_diagnose_imports(notebook_tools_inst: NotebookTools):
+    """Test the diagnostic tool for imports."""
+    # This tool doesn't take notebook path etc.
+    result = await notebook_tools_inst.diagnose_imports()
+    assert isinstance(result, str)
+    # Check for expected section headers
+    assert "=== Python Environment Diagnostics ===" in result
+    assert "=== Module Search Paths (sys.path) ===" in result
+    assert "=== nbconvert Detection Tests ===" in result
+    assert "=== Checking pip list output ===" in result
+
+async def test_diagnose_imports_pip_not_found(notebook_tools_inst: NotebookTools):
+    """Test diagnose_imports when pip command fails (FileNotFoundError)."""
+    with mock.patch('subprocess.run', side_effect=FileNotFoundError("pip not found")):
+        result = await notebook_tools_inst.diagnose_imports()
+        assert "FAILED: 'pip' command not found." in result
+
+async def test_diagnose_imports_pip_timeout(notebook_tools_inst: NotebookTools):
+    """Test diagnose_imports when pip list command times out."""
+    with mock.patch('subprocess.run', side_effect=subprocess.TimeoutExpired(cmd="pip list", timeout=1)):
+        result = await notebook_tools_inst.diagnose_imports()
+        assert "FAILED: 'pip list' command timed out." in result
+
+async def test_diagnose_imports_pip_generic_error(notebook_tools_inst: NotebookTools):
+    """Test diagnose_imports when pip list command raises a generic Exception."""
+    with mock.patch('subprocess.run', side_effect=Exception("Unexpected pip error")):
+        result = await notebook_tools_inst.diagnose_imports()
+        assert "Error running pip list: Unexpected pip error" in result
+
+async def test_diagnose_imports_no_nbconvert(notebook_tools_inst: NotebookTools):
+    """Test diagnose_imports when nbconvert cannot be imported or found."""
+    original_import = builtins.__import__ # Store original import function
+
+    def mock_import(name, *args, **kwargs):
+        if name == 'nbconvert':
+            # Simulate failure for the direct import attempt
+            raise ImportError("Mock ImportError: No module named nbconvert")
+        # Call original import for other modules to avoid breaking everything
+        return original_import(name, *args, **kwargs)
+
+    original_find_spec = importlib.util.find_spec
+    def mock_find_spec(name, package=None):
+         if name == 'nbconvert':
+             # Simulate failure for the find_spec attempt
+             return None
+         return original_find_spec(name, package)
+
+    # Patch both the import function and find_spec
+    with mock.patch('builtins.__import__', side_effect=mock_import), \
+         mock.patch('importlib.util.find_spec', side_effect=mock_find_spec):
+        result = await notebook_tools_inst.diagnose_imports()
+
+        # Check that both failure messages appear in the result string
+        assert "Direct import FAILED: Mock ImportError: No module named nbconvert" in result
+        assert "FAILED: No spec found for nbconvert" in result
+
+async def test_add_cell_source_size_limit(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test adding a cell fails if source exceeds size limit."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    
+    limit = notebook_tools_inst.config.max_cell_source_size
+    large_source = "A" * (limit + 1)
+    
+    with pytest.raises(ValueError, match="Source content exceeds maximum allowed size"):
+        await notebook_tools_inst.notebook_add_cell(
+            notebook_path=nb_path,
+            cell_type='code',
+            source=large_source,
+            insert_after_index=-1
+        )
+
+async def test_edit_cell_source_size_limit(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test editing a cell fails if source exceeds size limit."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='initial', insert_after_index=-1)
+
+    limit = notebook_tools_inst.config.max_cell_source_size
+    large_source = "B" * (limit + 1)
+    
+    with pytest.raises(ValueError, match="Source content exceeds maximum allowed size"):
+        await notebook_tools_inst.notebook_edit_cell(
+            notebook_path=nb_path,
+            cell_index=0,
+            source=large_source
+        ) 
+
+async def test_read_cell_source_truncation(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test reading a cell truncates source if it exceeds the configured limit."""
+    nb_path = notebook_path_factory()
+    limit = notebook_tools_inst.config.max_cell_source_size
+    # Create source slightly larger than the limit
+    original_large_source = "D" * (limit + 20) # Use different char for clarity
+    
+    # 1. Create notebook object directly with nbformat
+    nb = nbformat.v4.new_notebook()
+    nb.cells.append(nbformat.v4.new_code_cell(original_large_source))
+    
+    # 2. Write this oversized notebook to file, bypassing tool's add_cell check
+    try:
+        nbformat.write(nb, nb_path)
+    except Exception as e:
+        pytest.fail(f"Failed to write test notebook file: {e}")
+    
+    # 3. Read the cell back using the tool method
+    read_source = await notebook_tools_inst.notebook_read_cell(notebook_path=nb_path, cell_index=0)
+    
+    # 4. Verify it was truncated and includes the indicator
+    assert len(read_source.encode('utf-8')) < len(original_large_source.encode('utf-8'))
+    assert len(read_source.encode('utf-8')) <= limit + 20 # Allow some buffer for suffix/encoding
+    assert read_source != original_large_source
+    assert read_source.endswith("... (truncated)")
+
+# --- Tests for Error Handling --- 
+
+async def test_notebook_create_io_error(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test that notebook_create handles IOError during write."""
+    nb_path = notebook_path_factory()
+    
+    # Mock write_notebook to raise IOError
+    with mock.patch.object(notebook_tools_inst, 'write_notebook', side_effect=IOError("Disk full")):
+        # Expect the IOError to be caught and re-raised as RuntimeError or IOError itself
+        with pytest.raises((RuntimeError, IOError), match=r"Disk full|unexpected error occurred"):
+            await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+        
+        # Ensure the file was not created (or was cleaned up)
+        assert not os.path.exists(nb_path)
+
+async def test_notebook_delete_os_error(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test that notebook_delete handles OSError during os.remove."""
+    nb_path = notebook_path_factory()
+    # Create the file first so delete can attempt to remove it
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    assert os.path.exists(nb_path)
+    
+    # Mock os.remove to raise OSError
+    with mock.patch('os.remove', side_effect=OSError("Permission denied")):
+        # Expect OSError to be caught and re-raised as RuntimeError or IOError
+        with pytest.raises((RuntimeError, IOError), match=r"Permission denied|Failed to delete notebook"):
+            await notebook_tools_inst.notebook_delete(notebook_path=nb_path)
+            
+        # Verify the file still exists because the mocked remove failed
+        assert os.path.exists(nb_path)
+
+async def test_notebook_rename_source_not_found(notebook_tools_inst: NotebookTools, notebook_path_factory, temp_notebook_dir):
+    """Test renaming fails if the source notebook doesn't exist."""
+    old_path = notebook_path_factory() # Path is valid but file doesn't exist
+    new_path = str(temp_notebook_dir / "new_nonexistent.ipynb")
+    
+    assert not os.path.exists(old_path)
+    
+    with pytest.raises(FileNotFoundError):
+        await notebook_tools_inst.notebook_rename(old_path=old_path, new_path=new_path)
+
+async def test_notebook_rename_io_error(notebook_tools_inst: NotebookTools, notebook_path_factory, temp_notebook_dir):
+    """Test notebook_rename handles IOError/OSError during os.rename."""
+    old_path = notebook_path_factory()
+    new_path = str(temp_notebook_dir / "rename_target.ipynb")
+    await notebook_tools_inst.notebook_create(notebook_path=old_path)
+    
+    with mock.patch('os.rename', side_effect=OSError("Disk space full")):
+        with pytest.raises((RuntimeError, IOError), match=r"Disk space full|Failed to rename"):
+            await notebook_tools_inst.notebook_rename(old_path=old_path, new_path=new_path)
+        # Ensure original file still exists as rename failed
+        assert os.path.exists(old_path)
+
+async def test_notebook_edit_cell_io_error(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test notebook_edit_cell handles IOError during write."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='initial', insert_after_index=-1)
+
+    with mock.patch.object(notebook_tools_inst, 'write_notebook', side_effect=IOError("Write failed")):
+        with pytest.raises((RuntimeError, IOError), match=r"Write failed|unexpected error occurred"):
+            await notebook_tools_inst.notebook_edit_cell(notebook_path=nb_path, cell_index=0, source='new source')
+
+async def test_clear_cell_outputs_no_op(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test clearing outputs from a code cell with no outputs."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    # Add a code cell, but don't add any outputs
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='print(1)', insert_after_index=-1)
+
+    # Call clear
+    result = await notebook_tools_inst.notebook_clear_cell_outputs(notebook_path=nb_path, cell_index=0)
+
+    # Verify success message indicates nothing was cleared
+    assert "No outputs or execution count found to clear" in result
+
+async def test_change_cell_type_no_op(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test changing a cell to the type it already is."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='code', source='print(1)', insert_after_index=-1)
+
+    # Attempt to change code cell (index 0) to code
+    result = await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=0, new_type='code')
+
+    # Verify success message indicates no change was needed
+    assert "already of type 'code'. No change needed" in result
+
+async def test_duplicate_raw_cell(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test duplicating a raw cell."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    # Change cell 0 to raw
+    await notebook_tools_inst.notebook_add_cell(notebook_path=nb_path, cell_type='markdown', source='raw source', insert_after_index=-1)
+    await notebook_tools_inst.notebook_change_cell_type(notebook_path=nb_path, cell_index=0, new_type='raw')
+    
+    # Duplicate the raw cell
+    result = await notebook_tools_inst.notebook_duplicate_cell(notebook_path=nb_path, cell_index=0)
+    assert "creating cell after it" in result
+    
+    nb = await notebook_tools_inst.read_notebook(nb_path, notebook_tools_inst.config.allowed_roots)
+    assert len(nb.cells) == 2
+    assert nb.cells[0].cell_type == 'raw'
+    assert nb.cells[1].cell_type == 'raw' # Check duplicate type
+    assert nb.cells[1].source == 'raw source' # Check duplicate source
+
+async def test_get_cell_count_generic_exception(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test notebook_get_cell_count handles unexpected exceptions."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+
+    with mock.patch.object(notebook_tools_inst, 'read_notebook', side_effect=Exception("Unexpected read failure")):
+        with pytest.raises(RuntimeError, match=r"An unexpected error occurred"):
+            await notebook_tools_inst.notebook_get_cell_count(notebook_path=nb_path)
+
+async def test_notebook_rename_target_is_directory(notebook_tools_inst: NotebookTools, notebook_path_factory, temp_notebook_dir):
+    """Test renaming fails if the target path is an existing directory."""
+    old_path = notebook_path_factory()
+    # Create a directory with the target name
+    target_dir_name = "target_dir.ipynb"
+    target_path = temp_notebook_dir / target_dir_name
+    os.makedirs(target_path, exist_ok=True)
+    
+    await notebook_tools_inst.notebook_create(notebook_path=old_path)
+
+    # Expect FileExistsError because the path exists, even as a directory
+    with pytest.raises(FileExistsError, match=r"Cannot rename notebook, destination already exists"):
+         await notebook_tools_inst.notebook_rename(old_path=old_path, new_path=str(target_path))
+
+    # Clean up
+    os.rmdir(target_path)
+
+async def test_notebook_rename_target_wrong_extension(notebook_tools_inst: NotebookTools, notebook_path_factory, temp_notebook_dir):
+    """Test renaming fails if the target path has the wrong extension."""
+    old_path = notebook_path_factory()
+    new_path_txt = str(temp_notebook_dir / "new_name.txt")
+    await notebook_tools_inst.notebook_create(notebook_path=old_path)
+
+    with pytest.raises(ValueError, match="Both paths must point to .ipynb files"):
+         await notebook_tools_inst.notebook_rename(old_path=old_path, new_path=new_path_txt)

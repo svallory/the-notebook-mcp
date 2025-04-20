@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-04-19
+
+### Added
+- CI workflow using GitHub Actions (`.github/workflows/ci.yml`) to run tests on Python 3.9 and 3.12.
+- Code coverage reporting via `pytest-cov` and Coveralls integration (>70% overall, >80% for core tools).
+- Additional tests for `tools.py`, `server.py`, and `notebook_ops.py` targeting error conditions, edge cases, and validation logic.
+- Test script `run_tests.sh` to simplify local test execution with necessary environment variables.
+- Tests for SSE transport layer (`tests/test_sse_transport.py`).
+
+### Changed
+- Improved documentation in `README.md`:
+  - Added Video Walkthrough section and badges (Downloads, Issues, Coverage, MCP).
+  - Clarified `stdio` vs `sse` transport configuration in `mcp.json`, recommending SSE.
+  - Added troubleshooting tips for `stdio` environment issues.
+  - Refined "Suggested Cursor Rules" for clarity, tone, and promoting proactive tool use.
+  - Removed invalid comments from JSON examples.
+  - Explicitly documented external system requirements (Pandoc, LaTeX) for PDF export.
+- Updated project metadata (`classifiers`, `keywords`, `urls`) in `pyproject.toml`.
+- Configured `pytest` via `pyproject.toml` to set environment variables (`JUPYTER_PLATFORM_DIRS`).
+- Refactored `sse_transport.py` to separate app creation (`create_starlette_app`) for better testability.
+
+### Fixed
+- Bug in `notebook_read` size estimation loop (`NameError: name 'i' is not defined`).
+- Multiple test failures related to incorrect mocking, error expectations, path handling, test setup, and imports (`StringIO`, `FastMCP`).
+- Invalid escape sequence in `pyproject.toml` coverage exclusion pattern.
+
 ## [0.2.2] - 2025-04-19
 
 ### Fixed

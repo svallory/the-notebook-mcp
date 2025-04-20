@@ -1,7 +1,4 @@
-[![PyPI Version](https://img.shields.io/pypi/v/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/)
-[![Python Version](https://img.shields.io/pypi/pyversions/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/)
-[![License](https://img.shields.io/github/license/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp/blob/main/LICENSE)
-[![Last Commit](https://img.shields.io/github/last-commit/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp)
+[![PyPI Version](https://img.shields.io/pypi/v/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/) [![Total Downloads](https://img.shields.io/pepy/dt/cursor-notebook-mcp)](https://pepy.tech/project/cursor-notebook-mcp) [![License](https://img.shields.io/github/license/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp/blob/main/LICENSE) [![Python Version](https://img.shields.io/pypi/pyversions/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/) [![GitHub issues](https://img.shields.io/github/issues/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp/issues) [![Last Commit](https://img.shields.io/github/last-commit/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp) [![Coverage Status](https://coveralls.io/repos/github/jbeno/cursor-notebook-mcp/badge.svg?branch=main)](https://coveralls.io/github/jbeno/cursor-notebook-mcp?branch=main) ![](https://badge.mcpx.dev 'MCP') ![](https://badge.mcpx.dev?type=server&features=tools 'MCP server with features')
 
 # Jupyter Notebook MCP Server (for Cursor)
 
@@ -13,9 +10,23 @@ Although designed to overcome a limitation with Cursor, this MCP server does not
 
 This MCP server uses the `nbformat` library to safely manipulate notebook structures and enforces security by restricting operations to user-defined directories. It also uses `nbconvert` to enable exporting notebooks to various formats like Python scripts, HTML, and more. The server handles all notebook operations through a clean API that maintains notebook integrity and prevents malformed changes.
 
+## Video Walkthrough
+
+[![Video Walkthrough Thumbnail](https://img.youtube.com/vi/VOVMH-tle14/maxresdefault.jpg)](https://youtu.be/VOVMH-tle14)
+
+[Cursor Jupyter Notebook MCP Server](https://youtu.be/VOVMH-tle14) (YouTube) walks through:
+  - The current **limitations** of editing notebooks directly in Cursor.
+  - **Installing** and **configuring** the Notebook MCP Server.
+  - **Creating a notebook** from scratch (example shown: Singular Value Decomposition tutorial in less than 2 minutes).
+  - Demonstrating various **editing tools** (edit, split, duplicate cells).
+  - Reading notebook **metadata**.
+  - **Exporting** notebooks to python
+
+
+
 ## Latest Version
 
-**Current Version:** `0.2.2` - See the [CHANGELOG.md](CHANGELOG.md) for details on recent changes.
+**Current Version:** `0.2.3` - See the [CHANGELOG.md](CHANGELOG.md) for details on recent changes.
 
 ## Features
 
@@ -44,14 +55,27 @@ Exposes the following MCP tools (registered under the `notebook_mcp` server):
 *   `notebook_merge_cells`: Merges a cell with the cell immediately following it.
 *   `notebook_validate`: Validates the notebook structure against the `nbformat` schema.
 *   `notebook_get_info`: Retrieves general information (cell count, metadata, kernel, language info).
-*   `notebook_export`: Exports the notebook to another format (e.g., python, html) using nbconvert.
+*   `notebook_export`: Exports the notebook to another format (e.g., python, html) using nbconvert. **Note:** See External Dependencies below for requirements needed for certain export formats like PDF.
 
 ## Requirements
 
-*   Python 3.9+
-*   **Core:** `mcp`, `nbformat>=5.0`, `nbconvert>=6.0`, `ipython`, `jupyter_core` (Installed automatically via `pip install .`)
-*   **SSE Transport:** `uvicorn`, `starlette` (Installed via `pip install .[sse]`)
-*   **Testing:** `pytest`, `pytest-asyncio` (Installed via `pip install .[test]`)
+This project has both Python package dependencies and potentially external system dependencies for full functionality.
+
+### Python Dependencies
+
+*   **Python Version:** 3.9+
+*   **Core:** `mcp>=0.1.0`, `nbformat>=5.0`, `nbconvert>=6.0`, `ipython`, `jupyter_core`. These are installed automatically when you install `cursor-notebook-mcp`.
+*   **Optional - SSE Transport:** `uvicorn>=0.20.0`, `starlette>=0.25.0`. Needed only if using the SSE transport mode. Install via `pip install cursor-notebook-mcp[sse]`.
+*   **Optional - Development/Testing:** `pytest>=7.0`, `pytest-asyncio>=0.18`, `pytest-cov`, `coveralls`. Install via `pip install -e ".[dev]"` from source checkout.
+
+### External System Dependencies
+
+These are **not** Python packages and must be installed separately on your system for certain features to work:
+
+*   **Pandoc:** Required by `nbconvert` for many non-HTML export formats (including the intermediate steps for PDF). See [Pandoc installation instructions](https://pandoc.org/installing.html).
+*   **LaTeX (XeLaTeX recommended):** Required by `nbconvert` for exporting notebooks directly to PDF (`--to pdf` option used by `notebook_export` with `export_format="pdf"`). See [Installing TeX](https://nbconvert.readthedocs.io/en/latest/install.html#installing-tex).
+
+If these external dependencies are missing, the `notebook_export` tool may fail when attempting to export to formats that rely on them (like PDF).
 
 ## Installation
 
@@ -206,103 +230,27 @@ When using `sse`, you must run the server process manually first (see "Running t
 For smooth collaboration with the AI agent on Jupyter Notebooks, you might want to add rules like these to your Cursor configuration. Go to Cursor Settings > Rules and add them in either User Roles or Project Rules. This ensures that Cursor's AI features will consistently follow these best practices when working with Jupyter notebooks.
 
 ```markdown 
-**Jupyter Notebook Rules for Cursor:**
+### Jupyter Notebook Rules for Cursor (Using notebook_mcp):
 
-1.  **Tool Usage:** Use ONLY `notebook_mcp` tools for all notebook/cell operations. NEVER use `edit_file` on `.ipynb` files.
-2.  **Math Notation:** For LaTeX in Markdown cells, use `$ ... $` for inline math and `$$ ... $$` for display math. Avoid `\( ... \)` and `\[ ... \]`.
-3.  **Cell Magics:**
-    *   Avoid unsupported cell magics like `%%bash`, `%%timeit`, and `%%writefile`.
-    *   Use `!command` for shell commands instead of `%%bash`.
-    *   Use `%timeit` (line magic) for timing single statements.
-    *   `%%html` works for rendering HTML output.
-    *   `%%javascript` can execute (e.g., `alert`), but avoid relying on it for manipulating cell output display.
-4.  **Rich Outputs:** Matplotlib, Pandas DataFrames, Plotly, ipywidgets (`tqdm.notebook`), and embedded HTML in Markdown generally render correctly.
-5.  **Mermaid:** Diagrams in ` ```mermaid ``` ` blocks are not rendered by default.
+1.  **Tool Usage:**
+    *   Always use the tools provided by the `notebook_mcp` server for operations on Jupyter Notebook (`.ipynb`) files.
+    *   Avoid using the standard `edit_file` tool on `.ipynb` files, as this can corrupt the notebook structure.
+
+2.  **Investigation Strategy:**
+    *   A comprehensive suite of tools is available to inspect notebooks. If the user mentions an issue, a specific cell, or asks for a modification, first attempt to gather context independently.
+    *   Use the available tools (`notebook_read`, `notebook_read_cell`, `notebook_get_info`, `notebook_read_metadata`, `notebook_read_cell_output`, `notebook_validate`) to examine the notebook structure, content, metadata, and outputs to locate the relevant context or identify the problem.
+    *   Ask the user for clarification only if the necessary information cannot be determined after using the investigation tools.
+
+3.  **Available Tools:**
+    *   Be aware of the different categories of tools: File operations (`create`, `delete`, `rename`), Notebook/Cell Reading (`read`, `read_cell`, `get_cell_count`, `get_info`), Cell Manipulation (`add_cell`, `edit_cell`, `delete_cell`, `move_cell`, `change_cell_type`, `duplicate_cell`, `split_cell`, `merge_cells`), Metadata (`read/edit_metadata`, `read/edit_cell_metadata`), Outputs (`read_cell_output`, `clear_cell_outputs`, `clear_all_outputs`), and Utility (`
 ```
 
-## Command-Line Arguments
-
-The server accepts the following command-line arguments:
-
-*   `--allow-root`: (Required, can use multiple times) Absolute path to directory where notebooks are allowed.
-*   `--log-dir`: Directory to store log files. Defaults to `~/.cursor_notebook_mcp`.
-*   `--log-level`: Set the logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. Defaults to `INFO`.
-*   `--max-cell-source-size`: Maximum allowed size in bytes for cell source content. Defaults to 10 MiB.
-*   `--max-cell-output-size`: Maximum allowed size in bytes for cell output content. Defaults to 10 MiB.
-*   `--transport`: Transport type to use: `stdio` or `sse`. Defaults to `stdio`.
-*   `--host`: Host to bind the SSE server to. Only used with `--transport=sse`. Defaults to `127.0.0.1`.
-*   `--port`: Port to bind the SSE server to. Only used with `--transport=sse`. Defaults to `8080`.
-
-## Security
-
-*   **Workspace Root Enforcement:** The server **requires** the `--allow-root` command-line argument during startup. It will refuse to operate on any notebook file located outside the directories specified by these arguments. This is a critical security boundary.
-*   **Path Handling:** The server uses `os.path.realpath` to resolve paths and checks against the allowed roots before any read or write operation.
-*   **Input Validation:** Basic checks for `.ipynb` extension are performed.
-*   **Cell Source Size Limit:** The server enforces a maximum size limit (configurable via `--max-cell-source-size`, default 10 MiB) on the source content provided to `notebook_edit_cell` and `notebook_add_cell` to prevent excessive memory usage.
-*   **Cell Output Size Limit:** The server enforces a maximum size limit (configurable via `--max-cell-output-size`, default 10 MiB) on the total serialized size of outputs returned by `notebook_read_cell_output`.
-
-## Limitations
-
-*   **No Cell Execution:** This server **cannot execute** notebook cells. It operates solely on the `.ipynb` file structure using the `nbformat` library and does not interact with Jupyter kernels. Cell execution must be performed manually by the user within the Cursor UI (selecting the desired kernel and running the cell). Implementing execution capabilities in this server would require kernel management and introduce significant complexity and security considerations.
-
-## Known Issues
-
-*   **UI Refresh Issues:** Occasionally, some notebook operations (like cell splitting or merging) may succeed at the file level, but the Cursor UI might not show the updated content correctly. In such situations, you can:
-    * Close and re-open the notebook file
-    * Save the file, which might prompt to "Revert" or "Overwrite" - select "Revert" to reload the actual file content
-
-## Development & Testing
-
-1. Setup virtual environment and install dev dependencies:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -e ".[dev]"
-   ```
 2. Run tests:
    ```bash
-   pytest tests/
+   # Use the wrapper script to ensure environment variables are set
+   ./run_tests.sh 
+   # Or run specific tests
+   # ./run_tests.sh tests/test_notebook_tools.py
    ```
 
 ## Issues
-
-If you encounter any bugs or issues, please submit them to our GitHub issue tracker:
-
-1. Visit [jbeno/cursor-notebook-mcp](https://github.com/jbeno/cursor-notebook-mcp/issues)
-2. Click on "New Issue"
-3. Provide:
-   - A clear description of the problem
-   - Steps to reproduce the issue
-   - Expected vs actual behavior
-   - Your environment details (OS, Python version, etc.)
-   - Any relevant error messages or logs
-   - Which model and client/version you're using
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a new branch for your feature (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests to ensure nothing is broken (`pytest tests/`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to your branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-Please make sure your PR:
-- Includes tests for new functionality
-- Updates documentation as needed
-- Follows the existing code style
-- Includes a clear description of the changes
-
-For major changes, please open an issue first to discuss what you would like to change.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-
-## Author
-
-This project was created and is maintained by Jim Beno - jim@jimbeno.net

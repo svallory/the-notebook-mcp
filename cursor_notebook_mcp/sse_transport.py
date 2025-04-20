@@ -10,11 +10,16 @@ from typing import Any
 
 from starlette.applications import Starlette
 from starlette.routing import Mount, Route
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.exceptions import HTTPException
+from starlette.middleware import Middleware
+from starlette.middleware.errors import ServerErrorMiddleware
+
+from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
 
 # Use try-except for optional SSE dependencies
 try:
-    from mcp.server.sse import SseServerTransport
     import uvicorn
 except ImportError as e:
     # Define dummy classes or raise a more informative error later if SSE is selected
@@ -26,18 +31,92 @@ else:
 
 logger = logging.getLogger(__name__)
 
-def run_sse_server(mcp_server: Any, config: Any):
-    """
-    Runs the MCP server using SSE transport.
+# Assuming ServerConfig type hinting
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .server import ServerConfig
 
-    Args:
-        mcp_server: The initialized FastMCP server instance.
-        config: The ServerConfig object containing host, port, allowed_roots, etc.
-        
-    Raises:
-        ImportError: If required SSE/Uvicorn packages are not installed.
-        Exception: For other server startup errors.
-    """
+# Define the SSE handler endpoint
+async def handle_sse(request):
+    """Handles incoming SSE connections and delegates to MCP transport."""
+    mcp_server = request.app.state.mcp_server
+    config = request.app.state.config
+    client_host = request.client.host
+    client_port = request.client.port
+    log_prefix = f"[SSE {client_host}:{client_port}]"
+    logger.info(f"{log_prefix} New SSE connection request from {client_host}:{client_port}")
+
+    transport = SseServerTransport()
+    try:
+        logger.debug(f"{log_prefix} Setting up SSE connection")
+        # connect_sse handles the SSE handshake and provides streams
+        async with transport.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            read_stream, write_stream = streams
+            logger.info(f"{log_prefix} Connection established. Running MCP session.")
+            # Run the MCP server logic using the established streams
+            await mcp_server._mcp_server.run(
+                transport='stream', 
+                read_stream=read_stream, 
+                write_stream=write_stream
+            )
+            logger.info(f"{log_prefix} MCP session finished.")
+    except Exception as e:
+        # Log errors during the SSE connection or MCP run phase
+        logger.error(f"{log_prefix} Error during SSE connection with {client_host}:{client_port}: {e}", exc_info=True)
+        # Optionally re-raise or return an error response if possible (often too late)
+        # Starlette might handle sending a 500 if the connection is still open
+    finally:
+        logger.info(f"{log_prefix} Closing SSE connection.")
+        # Cleanup handled by context managers
+
+# Define the root status endpoint
+async def handle_root(request):
+    """Simple status endpoint for the root path."""
+    config = request.app.state.config
+    return JSONResponse({"status": "MCP SSE Server Running", "version": config.version})
+
+# Define exception handler
+async def http_exception_handler(request, exc):
+    logger.warning(f"HTTP Exception: {exc.status_code} {exc.detail} for {request.url}")
+    return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
+
+async def generic_exception_handler(request, exc):
+    logger.exception(f"Unhandled exception for {request.url}: {exc}")
+    return PlainTextResponse("Internal Server Error", status_code=500)
+
+exception_handlers = {
+    HTTPException: http_exception_handler,
+    Exception: generic_exception_handler
+}
+
+# Function to create the Starlette app (refactored)
+def create_starlette_app(mcp_server: FastMCP, config: 'ServerConfig') -> Starlette:
+    """Creates the Starlette application instance."""
+    routes = [
+        Route("/", endpoint=handle_root, methods=["GET"]),
+        Route("/sse", endpoint=handle_sse) # Default methods handled by SSE transport
+    ]
+    middleware = [
+        Middleware(ServerErrorMiddleware, handler=generic_exception_handler)
+    ]
+    
+    app = Starlette(
+        routes=routes, 
+        middleware=middleware,
+        exception_handlers=exception_handlers,
+        debug=config.log_level <= logging.DEBUG # Enable debug mode based on log level
+    )
+    # Store shared instances in app state
+    app.state.mcp_server = mcp_server
+    app.state.config = config
+    return app
+
+
+# Main function to run the SSE server
+def run_sse_server(mcp_server: FastMCP, config: 'ServerConfig'):
+    """Configures and runs the Uvicorn server for SSE transport."""
     if SseServerTransport is None or uvicorn is None:
         logger.error(f"SSE transport requires additional packages ('mcp-sdk[sse]', 'uvicorn'). Install error: {_sse_import_error}")
         raise ImportError(
@@ -45,31 +124,23 @@ def run_sse_server(mcp_server: Any, config: Any):
             f"Please install with 'pip install \"cursor-notebook-mcp[sse]\"' or 'pip install uvicorn mcp-sdk[sse]'. Error: {_sse_import_error}"
         ) from _sse_import_error
 
-    # Create SSE transport instance, messages are posted back to this path
-    transport = SseServerTransport("/messages/")
-
-    async def handle_sse(request):
-        """Handles incoming SSE connection requests."""
-        client_addr = f"{request.client.host}:{request.client.port}"
-        logger.info(f"New SSE connection request from {client_addr}")
-        try:
-            # connect_sse handles the SSE handshake and provides streams
-            async with transport.connect_sse(
-                request.scope, request.receive, request._send
-            ) as streams:
-                logger.info(f"SSE connection established with {client_addr}")
-                # Run the core MCP message loop with the established streams
-                await mcp_server._mcp_server.run(
-                    streams[0], # Input stream
-                    streams[1], # Output stream
-                    mcp_server._mcp_server.create_initialization_options()
-                )
-                logger.info(f"SSE connection closed for {client_addr}")
-        except Exception as e:
-            # Log exceptions during the connection lifecycle
-            logger.exception(f"Error during SSE connection with {client_addr}: {e}")
-            # Re-raise to potentially send an error response if handshake hasn't completed
-            raise
+    try:
+        # Create the Starlette app
+        app = create_starlette_app(mcp_server, config)
+        
+        logger.info(f"Starting Uvicorn server on {config.host}:{config.port}")
+        uvicorn.run(
+            app, 
+            host=config.host, 
+            port=config.port,
+            log_level=config.log_level # Pass log level to uvicorn
+        )
+    except ImportError:
+        logger.error("Failed to import uvicorn. Please install with '[sse]' extra: pip install cursor-notebook-mcp[sse]")
+        raise # Re-raise for main server loop to catch
+    except Exception as e:
+        logger.exception(f"Failed to start or run Uvicorn server: {e}")
+        raise # Re-raise for main server loop to catch
 
     async def health_endpoint(request):
         """Simple health check endpoint."""
