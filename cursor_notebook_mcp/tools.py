@@ -10,7 +10,9 @@ import subprocess
 import importlib.util
 import logging
 import json
-from typing import Any, List, Dict, Callable, Coroutine
+from typing import Any, List, Dict, Callable, Coroutine, Union
+import ast
+import re
 
 import nbformat
 from nbformat import NotebookNode
@@ -77,6 +79,8 @@ class NotebookTools:
             self.notebook_read,
             self.notebook_change_cell_type,
             self.notebook_duplicate_cell,
+            self.notebook_get_outline,
+            self.notebook_search,
         ]
         for tool_method in tools_to_register:
             # Use the method's name and docstring for registration
@@ -1040,4 +1044,238 @@ class NotebookTools:
             raise
         except Exception as e:
             logger.exception(f"{log_prefix} FAILED - Unexpected error: {e}")
-            raise RuntimeError(f"An unexpected error occurred: {e}") from e 
+            raise RuntimeError(f"An unexpected error occurred: {e}") from e
+
+    async def notebook_get_outline(self, notebook_path: str) -> List[Dict[str, Union[int, str, List[str]]]]:
+        """Analyzes a Jupyter notebook file to extract its structure.
+
+        Reads the notebook, iterates through cells, identifies their type,
+        extracts definitions (func, class), headings (H1, H2), significant comments (comment:),
+        and calculates line counts. Returns a default context line if no other outline is found.
+
+        Args:
+            notebook_path: The absolute path to the .ipynb notebook file.
+
+        Returns:
+            A list of dictionaries, where each dictionary represents a cell
+            and contains:
+            - 'index': The 0-based index of the cell.
+            - 'type': The cell type ('code' or 'markdown').
+            - 'line_count': The total number of lines in the cell.
+            - 'outline': A list of strings representing the outline items found.
+                         Guaranteed to contain at least one item.
+        """
+        log_prefix = self._log_prefix('notebook_get_outline', path=notebook_path)
+        logger.info(f"{log_prefix} Called.")
+        try:
+            # read_notebook already performs path validation and read
+            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+
+            # <<< Add check for empty notebook here >>>
+            if not nb.cells:
+                logger.info(f"{log_prefix} SUCCESS - Notebook is empty.")
+                return [{"message": "Notebook is empty or has no cells"}]
+
+            structure_map: List[Dict[str, Union[int, str, List[str]]]] = []
+
+            for index, cell in enumerate(nb.cells):
+                outline_items = []
+                line_count = len(cell.source.splitlines())
+
+                if cell.cell_type == 'code':
+                    outline_items = self._extract_code_outline(cell.source)
+                elif cell.cell_type == 'markdown':
+                    outline_items = self._extract_markdown_outline(cell.source)
+
+                # Ensure there's at least one outline item (context if needed)
+                if not outline_items:
+                    outline_items = self._get_first_line_context(cell.source)
+
+                cell_info: Dict[str, Union[int, str, List[str]]] = {
+                    "index": index,
+                    "type": cell.cell_type,
+                    "line_count": line_count,
+                    "outline": outline_items
+                }
+                structure_map.append(cell_info)
+
+            logger.info(f"{log_prefix} SUCCESS - Generated outline ({len(structure_map)} cells analyzed).")
+            return structure_map # Return the structured list
+
+        except (ValueError, FileNotFoundError, IOError, PermissionError) as e:
+            logger.error(f"{log_prefix} FAILED - Specific error: {e}")
+            raise
+        except Exception as e:
+            logger.exception(f"{log_prefix} FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred: {e}") from e
+
+    # --- Helper methods for outline generation --- 
+
+    def _extract_code_outline(self, source: str) -> List[str]:
+        """Extracts functions, classes, and comment headings from code."""
+        outline = []
+        # First pass for comment headings
+        try:
+            lines = source.splitlines()
+            for line in lines:
+                match = re.match(r'^\s*#\s+(.*)', line) # Match comments like '# Heading'
+                if match and match.group(1):
+                     outline.append(f"comment: {match.group(1).strip()}")
+        except Exception as e:
+            logger.warning(f"Error parsing comments for outline: {e}")
+            # Continue to AST parsing even if comment parsing fails
+
+        # Second pass for AST elements (functions, classes)
+        try:
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    outline.append(f"func: {node.name}")
+                elif isinstance(node, ast.ClassDef):
+                    outline.append(f"class: {node.name}")
+        except SyntaxError:
+            # If syntax is invalid, AST parsing fails. Add indicator.
+            # Avoid adding if already found comment headings.
+            if not any(item.startswith("comment:") for item in outline):
+                 outline.append("<Syntax Error>")
+            # Keep any comment headings found before the error
+        except Exception as e:
+            # Catch other potential AST parsing errors
+            if not outline: # Avoid adding if we already have items
+                outline.append(f"<AST Parsing Error: {e}>")
+        return outline
+
+    def _extract_markdown_outline(self, source: str) -> List[str]:
+        """Extracts markdown headings (H1, H2, etc.) and HTML headings (h1-h6) from markdown."""
+        headings = []
+        # Regex to find HTML headings like <h1...>...</h1>, capturing level and content
+        # Handles attributes in the opening tag and ignores case for tag names
+        html_heading_re = re.compile(r'<h([1-6])[^>]*>(.*?)</h\1>', re.IGNORECASE | re.DOTALL)
+        try:
+            lines = source.split('\n')
+            for line in lines:
+                stripped_line = line.strip()
+                # Check for Markdown heading first
+                md_match = re.match(r'^(#+)\s+(.*)', stripped_line)
+                if md_match:
+                    level = len(md_match.group(1))
+                    heading_text = md_match.group(2).strip()
+                    if heading_text:
+                        headings.append(f"H{level}: {heading_text}")
+                else:
+                    # If not Markdown, check for HTML heading
+                    # We search the stripped_line instead of match to find tag anywhere
+                    html_match = html_heading_re.search(stripped_line)
+                    if html_match:
+                        level = int(html_match.group(1))
+                        # Basic cleanup: remove potential inner tags for outline brevity
+                        heading_text = re.sub(r'<.*?>', '', html_match.group(2)).strip()
+                        if heading_text:
+                            headings.append(f"H{level}: {heading_text}")
+
+        except AttributeError:
+             headings.append("<Missing Source>") # Should be rare
+        except Exception as e:
+             headings.append(f"<Markdown Parsing Error: {e}>")
+        return headings
+
+    def _get_first_line_context(self, source: str) -> List[str]:
+        """Gets the first non-empty line as context if no other outline found."""
+        try:
+            for line in source.splitlines():
+                stripped_line = line.strip()
+                if stripped_line:
+                    # Truncate long lines for brevity
+                    context = stripped_line[:100] + ('...' if len(stripped_line) > 100 else '')
+                    return [f"context: {context}"]
+            # If loop finishes without finding a non-empty line
+            return ["<Empty Cell>"]
+        except Exception as e:
+            logger.warning(f"Error getting first line context: {e}")
+            return ["<Error getting context>"] 
+
+    async def notebook_search(
+        self,
+        notebook_path: str,
+        query: str
+    ) -> List[Dict[str, Union[int, str]]]:
+        """Searches within a notebook's code and markdown cells for a query string.
+
+        Performs a case-insensitive search within the source of each cell.
+
+        Args:
+            notebook_path: Absolute path to the .ipynb notebook file.
+            query: The string to search for.
+
+        Returns:
+            A list of dictionaries, where each dictionary represents a match:
+            - 'cell_index': The 0-based index of the matching cell.
+            - 'cell_type': The type of the matching cell ('code' or 'markdown').
+            - 'match_line_number': The 1-based line number within the cell where the match occurred.
+            - 'snippet': A truncated snippet of the line containing the match.
+        """
+        log_prefix = self._log_prefix('notebook_search', path=notebook_path, query=query)
+        logger.info(f"{log_prefix} Called.")
+        
+        if not query:
+            raise ValueError("Search query cannot be empty.")
+            
+        results: List[Dict[str, Union[int, str]]] = []
+        try:
+            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            query_lower = query.lower()
+            MAX_SNIPPET_LEN = 150 # Max length for the snippet
+
+            for index, cell in enumerate(nb.cells):
+                try:
+                    source = cell.source
+                    cell_type = cell.cell_type
+                    lines = source.splitlines()
+                    for line_num_0based, line in enumerate(lines):
+                        if query_lower in line.lower():
+                            line_num_1based = line_num_0based + 1
+                            # Create snippet, truncating if necessary
+                            snippet = line.strip()
+                            if len(snippet) > MAX_SNIPPET_LEN:
+                                # Try to find query position for better truncation
+                                try:
+                                    match_start = snippet.lower().index(query_lower)
+                                    start = max(0, match_start - MAX_SNIPPET_LEN // 3)
+                                    end = min(len(snippet), match_start + len(query) + (MAX_SNIPPET_LEN * 2 // 3))
+                                    prefix = "..." if start > 0 else ""
+                                    suffix = "..." if end < len(snippet) else ""
+                                    snippet = prefix + snippet[start:end] + suffix
+                                except ValueError:
+                                    # Fallback if query not found after lowercasing (shouldn't happen often)
+                                    snippet = snippet[:MAX_SNIPPET_LEN] + "..."
+                            
+                            results.append({
+                                "cell_index": index,
+                                "cell_type": cell_type,
+                                "match_line_number": line_num_1based,
+                                "snippet": snippet
+                            })
+                except AttributeError:
+                    # Skip cells that might unexpectedly lack a source attribute
+                    logger.warning(f"{log_prefix} Skipping cell {index} due to missing source.")
+                    continue
+                except Exception as cell_err:
+                    # Log error processing a specific cell but continue searching others
+                    logger.error(f"{log_prefix} Error processing cell {index}: {cell_err}")
+                    continue # Continue to the next cell
+
+            # <<< Add the check for empty results here >>>
+            if not results:
+                logger.info(f"{log_prefix} SUCCESS - No matches found.")
+                # Return a specific message instead of an empty list
+                return [{"message": "No matches found"}] 
+            else:
+                logger.info(f"{log_prefix} SUCCESS - Found {len(results)} match(es).")
+                return results
+
+        except (ValueError, FileNotFoundError, IOError, PermissionError) as e:
+            logger.error(f"{log_prefix} FAILED - Specific error: {e}")
+            raise
+        except Exception as e:
+            logger.exception(f"{log_prefix} FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred during notebook search: {e}") from e 

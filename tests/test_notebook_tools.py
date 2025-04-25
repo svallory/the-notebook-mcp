@@ -1248,3 +1248,146 @@ async def test_notebook_rename_target_wrong_extension(notebook_tools_inst: Noteb
 
     with pytest.raises(ValueError, match="Both paths must point to .ipynb files"):
          await notebook_tools_inst.notebook_rename(old_path=old_path, new_path=new_path_txt)
+
+# <<< Add tests for outline and search here >>>
+
+async def test_notebook_get_outline(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test the notebook_get_outline tool with various cell types."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+
+    # 1. Test empty notebook
+    outline_empty = await notebook_tools_inst.notebook_get_outline(notebook_path=nb_path)
+    assert outline_empty == [{"message": "Notebook is empty or has no cells"}]
+
+    # 2. Add cells with various content
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'markdown', '# Section 1\n## Subsection 1.1', -1) # idx 0
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', 'def my_func():\n    pass\n\nclass MyClass:\n    pass', 0) # idx 1
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', '# Process data\nx = 1 + 1\nprint(x)', 1) # idx 2
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'markdown', 'Just some explanation text.', 2) # idx 3
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', 'import os\nimport sys', 3) # idx 4
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', 'def invalid syntax(', 4) # idx 5
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'markdown', '<H3>HTML Heading</H3>', 5) # idx 6
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', '', 6) # idx 7 (empty)
+
+    # 3. Get outline for populated notebook
+    outline_populated = await notebook_tools_inst.notebook_get_outline(notebook_path=nb_path)
+    
+    assert isinstance(outline_populated, list)
+    assert len(outline_populated) == 8 # Should match number of cells
+
+    # Check structure of each item
+    for item in outline_populated:
+        assert isinstance(item, dict)
+        assert all(k in item for k in ['index', 'type', 'line_count', 'outline'])
+        assert isinstance(item['outline'], list)
+        assert len(item['outline']) >= 1 # Ensure at least one item (context or specific)
+
+    # Check specific cells
+    assert outline_populated[0]['type'] == 'markdown'
+    assert outline_populated[0]['line_count'] == 2
+    assert outline_populated[0]['outline'] == ['H1: Section 1', 'H2: Subsection 1.1']
+    
+    assert outline_populated[1]['type'] == 'code'
+    assert outline_populated[1]['line_count'] == 5
+    assert outline_populated[1]['outline'] == ['func: my_func', 'class: MyClass']
+
+    assert outline_populated[2]['type'] == 'code'
+    assert outline_populated[2]['line_count'] == 3
+    assert outline_populated[2]['outline'] == ['comment: Process data'] # Comment heading takes precedence
+
+    assert outline_populated[3]['type'] == 'markdown'
+    assert outline_populated[3]['line_count'] == 1
+    assert outline_populated[3]['outline'] == ['context: Just some explanation text.'] # No headings, uses context
+
+    assert outline_populated[4]['type'] == 'code'
+    assert outline_populated[4]['line_count'] == 2
+    assert outline_populated[4]['outline'] == ['context: import os'] # No definitions/comments, uses context
+
+    assert outline_populated[5]['type'] == 'code'
+    assert outline_populated[5]['line_count'] == 1
+    assert outline_populated[5]['outline'] == ['<Syntax Error>']
+    
+    assert outline_populated[6]['type'] == 'markdown'
+    assert outline_populated[6]['line_count'] == 1
+    assert outline_populated[6]['outline'] == ['H3: HTML Heading'] # HTML Heading detected
+
+    assert outline_populated[7]['type'] == 'code'
+    assert outline_populated[7]['line_count'] == 0
+    assert outline_populated[7]['outline'] == ['<Empty Cell>'] # Empty cell
+
+
+async def test_notebook_search(notebook_tools_inst: NotebookTools, notebook_path_factory):
+    """Test the notebook_search tool."""
+    nb_path = notebook_path_factory()
+    await notebook_tools_inst.notebook_create(notebook_path=nb_path)
+    
+    # 1. Test empty notebook
+    search_empty = await notebook_tools_inst.notebook_search(notebook_path=nb_path, query="anything")
+    assert search_empty == [{"message": "No matches found"}]
+
+    # 2. Add cells
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'markdown', '# Search Me\nThis cell contains the word SEARCH.', -1) # idx 0
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', 'def search_func():\n    # Search within comments\n    print("found")', 0) # idx 1
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'code', 'x = "Search case insensitive"\nx = x.upper() # search should still find it', 1) # idx 2
+    await notebook_tools_inst.notebook_add_cell(nb_path, 'markdown', 'Another cell.', 2) # idx 3
+
+    # 3. Search for existing term (case-insensitive)
+    results = await notebook_tools_inst.notebook_search(notebook_path=nb_path, query="search")
+    assert len(results) == 6 # Corrected assertion
+    
+    # Check first match (markdown heading)
+    assert results[0]['cell_index'] == 0
+    assert results[0]['cell_type'] == 'markdown'
+    assert results[0]['match_line_number'] == 1
+    assert '# Search Me' in results[0]['snippet']
+
+    # Check second match (markdown content)
+    assert results[1]['cell_index'] == 0
+    assert results[1]['cell_type'] == 'markdown'
+    assert results[1]['match_line_number'] == 2
+    assert 'contains the word SEARCH' in results[1]['snippet']
+
+    # Check third match (code function name)
+    assert results[2]['cell_index'] == 1
+    assert results[2]['cell_type'] == 'code'
+    assert results[2]['match_line_number'] == 1
+    assert 'def search_func()' in results[2]['snippet']
+
+    # Check fourth match (code comment)
+    assert results[3]['cell_index'] == 1
+    assert results[3]['cell_type'] == 'code'
+    assert results[3]['match_line_number'] == 2
+    assert '# Search within comments' in results[3]['snippet']
+
+    # Check fifth match (code variable content)
+    assert results[4]['cell_index'] == 2
+    assert results[4]['cell_type'] == 'code'
+    assert results[4]['match_line_number'] == 1
+    assert 'x = "Search case insensitive"' in results[4]['snippet']
+
+    # Add check for the 6th match (comment in cell 2)
+    assert results[5]['cell_index'] == 2
+    assert results[5]['cell_type'] == 'code'
+    assert results[5]['match_line_number'] == 2
+    assert '# search should still find it' in results[5]['snippet']
+
+    # 4. Search for different case
+    results_upper = await notebook_tools_inst.notebook_search(notebook_path=nb_path, query="SEARCH")
+    assert len(results_upper) == 6 # Corrected assertion
+
+    # 5. Search for unique term in comment
+    results_comment = await notebook_tools_inst.notebook_search(notebook_path=nb_path, query="within comments")
+    assert len(results_comment) == 1
+    assert results_comment[0]['cell_index'] == 1
+    assert results_comment[0]['match_line_number'] == 2
+
+    # 6. Search for term not present
+    results_none = await notebook_tools_inst.notebook_search(notebook_path=nb_path, query="nonexistentXYZ")
+    assert results_none == [{"message": "No matches found"}]
+    
+    # 7. Test empty query
+    with pytest.raises(ValueError, match="Search query cannot be empty"):
+        await notebook_tools_inst.notebook_search(notebook_path=nb_path, query="")
+
+# <<< End of added tests >>>
