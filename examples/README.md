@@ -1,6 +1,6 @@
-# Cursor Notebook MCP Examples
+# The Notebook MCP Examples
 
-This directory contains examples demonstrating how to use the Cursor Notebook MCP server.
+This directory contains examples demonstrating how to use the The Notebook MCP server.
 
 ## stdio Transport (Default)
 
@@ -12,7 +12,7 @@ For stdio transport, Cursor manages the server process automatically. You just n
 {
   "mcpServers": {
     "notebook_mcp": {
-      "command": "cursor-notebook-mcp",
+      "command": "the-notebook-mcp",
       "args": [
         "--allow-root", "/absolute/path/to/your/notebooks",
         "--log-level", "INFO"
@@ -36,7 +36,7 @@ Make sure the package is installed (`pip install .[sse]`) or run from the source
 
 ```bash
 # If installed:
-cursor-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
+the-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
 
 # Or running from source (ensure venv is active):
 # python notebook_mcp_server.py --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
@@ -74,7 +74,7 @@ Option 1: Use the absolute path to the installed script in your virtual environm
 {
   "mcpServers": {
     "notebook_mcp": {
-      "command": "/absolute/path/to/venv/bin/cursor-notebook-mcp",
+      "command": "/absolute/path/to/venv/bin/the-notebook-mcp",
       "args": ["--allow-root", "/path/to/notebooks"]
     }
   }
@@ -116,19 +116,19 @@ Always activate your virtual environment before launching the server:
 source /path/to/venv/bin/activate
 
 # Then launch the installed server script
-cursor-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
+the-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
 ```
 
-When using a systemd service (like `cursor-notebook-mcp.service` in this directory):
+When using a systemd service (like `the-notebook-mcp.service` in this directory):
 
 ```ini
 # In your systemd service file:
 
 # Option 1: Use direct path to the installed script in venv (Recommended if installed)
-ExecStart=/path/to/venv/bin/cursor-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
+ExecStart=/path/to/venv/bin/the-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks
 
 # Option 2: Or use bash to source the environment first
-# ExecStart=/bin/bash -c 'source /path/to/venv/bin/activate && cursor-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks'
+# ExecStart=/bin/bash -c 'source /path/to/venv/bin/activate && the-notebook-mcp --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks'
 
 # Option 3: Or use direct python path and script path
 # ExecStart=/path/to/venv/bin/python /path/to/project/notebook_mcp_server.py --transport sse --host 127.0.0.1 --port 8080 --allow-root /path/to/notebooks

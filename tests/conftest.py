@@ -3,22 +3,21 @@ Pytest configuration and fixtures for notebook MCP server tests.
 """
 
 import pytest
-import os
 import sys
-import asyncio
 from pathlib import Path
-from typing import List, Callable
+from typing import Callable
 import uuid
 import shutil # Add import for shutil
+from the_notebook_mcp.server.main import ServerConfig
+from the_notebook_mcp.tools import NotebookTools
+from mcp.server.fastmcp import FastMCP
 
 # Add project root to sys.path to allow importing the package
-project_root = Path(__file__).parent.parent
+current_dir = Path(__file__).parent
+project_root = current_dir.parent
 sys.path.insert(0, str(project_root))
 
 # Import necessary components from the package and server script
-from cursor_notebook_mcp.server import ServerConfig
-from cursor_notebook_mcp.tools import NotebookTools
-from mcp.server.fastmcp import FastMCP
 
 # --- Fixtures ---
 
@@ -44,6 +43,7 @@ def server_config(temp_notebook_dir: Path) -> ServerConfig:
         transport = 'stdio' # Default, doesn't matter for direct tool testing
         host = '127.0.0.1'
         port = 8080
+        path = '/mcp' # Added path parameter
         
     return ServerConfig(MockArgs())
 
@@ -76,7 +76,7 @@ def notebook_path_factory(temp_notebook_dir: Path) -> Callable[[], str]:
 @pytest.fixture(scope="session")
 def cli_command_path() -> str:
     """
-    Returns the absolute path to the installed cursor-notebook-mcp script
+    Returns the absolute path to the installed the-notebook-mcp script
     within the current environment's bin directory. Skips tests if not found.
     """
     # Find the bin/Scripts directory associated with the current Python executable
@@ -84,7 +84,7 @@ def cli_command_path() -> str:
     venv_bin_path = Path(python_executable).parent
 
     # Construct the expected path to the script
-    script_name = "cursor-notebook-mcp"
+    script_name = "the-notebook-mcp"
     # Handle potential .exe extension on Windows
     if sys.platform == "win32":
         script_name += ".exe"
@@ -99,4 +99,4 @@ def cli_command_path() -> str:
         else:
              pytest.skip(f"'{script_name}' command not found in venv bin or PATH.")
 
-    return str(script_path) 
+    return str(script_path)

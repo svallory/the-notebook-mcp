@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "jupyter": {
+      "command": "the-notebook-mcp",
+      "args": [
+        "--allow-root /work/crossover/hermes/notebooks"
+      ],
+      "env": {
+        "NOTEBOOK_PATH": "/work/crossover/hermes/notebooks/hermes.ipynb"
+      }
+    }
+  }
+}

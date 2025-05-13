@@ -1,6 +1,6 @@
-[![PyPI Version](https://img.shields.io/pypi/v/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/) [![Total Downloads](https://img.shields.io/pepy/dt/cursor-notebook-mcp)](https://pepy.tech/project/cursor-notebook-mcp) [![License](https://img.shields.io/github/license/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp/blob/main/LICENSE) [![Python Version](https://img.shields.io/pypi/pyversions/cursor-notebook-mcp)](https://pypi.org/project/cursor-notebook-mcp/) [![GitHub issues](https://img.shields.io/github/issues/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp/issues) [![Last Commit](https://img.shields.io/github/last-commit/jbeno/cursor-notebook-mcp)](https://github.com/jbeno/cursor-notebook-mcp) [![Coverage Status](https://coveralls.io/repos/github/jbeno/cursor-notebook-mcp/badge.svg?branch=main)](https://coveralls.io/github/jbeno/cursor-notebook-mcp?branch=main) ![](https://badge.mcpx.dev 'MCP') ![](https://badge.mcpx.dev?type=server&features=tools 'MCP server with features')
+[![PyPI Version](https://img.shields.io/pypi/v/the-notebook-mcp)](https://pypi.org/project/the-notebook-mcp/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/the-notebook-mcp)](https://pypi.org/project/the-notebook-mcp/) [![Total Downloads](https://img.shields.io/pepy/dt/the-notebook-mcp)](https://pepy.tech/project/the-notebook-mcp) [![License](https://img.shields.io/github/license/svallory/the-notebook-mcp)](https://github.com/svallory/the-notebook-mcp/blob/main/LICENSE) [![Python Version](https://img.shields.io/pypi/pyversions/the-notebook-mcp)](https://pypi.org/project/the-notebook-mcp/) [![GitHub issues](https://img.shields.io/github/issues/svallory/the-notebook-mcp)](https://github.com/svallory/the-notebook-mcp/issues) [![Last Commit](https://img.shields.io/github/last-commit/svallory/the-notebook-mcp)](https://github.com/svallory/the-notebook-mcp) [![Coverage Status](https://coveralls.io/repos/github/svallory/the-notebook-mcp/badge.svg?branch=main)](https://coveralls.io/github/svallory/the-notebook-mcp?branch=main) ![](https://badge.mcpx.dev 'MCP') ![](https://badge.mcpx.dev?type=server&features=tools 'MCP server with features')
 
-# Jupyter Notebook MCP Server (for Cursor)
+# The Notebook MCP
 
 This directory contains a Model Context Protocol (MCP) server designed to allow AI agents **within Cursor** to interact with Jupyter Notebook (`.ipynb`) files. It was created to overcome a limitation with Cursor. As of version 0.48.9, in Agent mode, the model could not edit notebooks or notebook cells in response to dialog in the AI chat pane. This provides the agent with a suite of MCP tools that allow direct notebook cell manipulation.
 
@@ -9,6 +9,10 @@ I'm sure at some point this will be handled natively by Cursor, but I have a dat
 Although designed to overcome a limitation with Cursor, this MCP server does not have anything specific to Cursor other than the configuration instructions. You could easily configure this for use with Claude Code or any model/agent that can take advantage of MCP.
 
 This MCP server uses the `nbformat` library to safely manipulate notebook structures and enforces security by restricting operations to user-defined directories. It also uses `nbconvert` to enable exporting notebooks to various formats like Python scripts, HTML, and more. The server handles all notebook operations through a clean API that maintains notebook integrity and prevents malformed changes.
+
+## Acknowledgment
+
+This is based on the great work of [Jim Beno](https://github.com/jbeno?tab=repositories) in [cursor-notebook-mcp](https://github.com/jbeno/cursor-notebook-mcp). It was initially a fork, but I changed it so much that being a fork stopped making sense as it is now impossible to send direct PRs.
 
 ## Video Walkthrough
 
@@ -64,8 +68,9 @@ This project has both Python package dependencies and potentially external syste
 ### Python Dependencies
 
 *   **Python Version:** 3.9+
-*   **Core:** `mcp>=0.1.0`, `nbformat>=5.0`, `nbconvert>=6.0`, `ipython`, `jupyter_core`. These are installed automatically when you install `cursor-notebook-mcp`.
-*   **Optional - SSE Transport:** `uvicorn>=0.20.0`, `starlette>=0.25.0`. Needed only if using the SSE transport mode. Install via `pip install cursor-notebook-mcp[sse]`.
+*   **Core:** `mcp>=0.1.0`, `nbformat>=5.0`, `nbconvert>=6.0`, `ipython`, `jupyter_core`. These are installed automatically when you install `the-notebook-mcp`.
+*   `starlette`: Required for SSE transport mode. Installed automatically when you install `the-notebook-mcp`.
+*   `uvicorn`: Required for SSE transport mode. Install via `pip install the-notebook-mcp[sse]`.
 *   **Optional - Development/Testing:** `pytest>=7.0`, `pytest-asyncio>=0.18`, `pytest-cov`, `coveralls`. Install via `pip install -e ".[dev]"` from source checkout.
 
 ### External System Dependencies
@@ -83,70 +88,85 @@ If these external dependencies are missing, the `notebook_export` tool may fail 
 
 ```bash
 # Basic installation (stdio transport only)
-pip install cursor-notebook-mcp
+# pip install the-notebook-mcp
+uv pip install the-notebook-mcp
 
 # With SSE transport support
-pip install "cursor-notebook-mcp[sse]"
+# pip install "the-notebook-mcp[sse]"
+uv pip install "the-notebook-mcp[sse]"
 ```
 
 ### Development Installation (From Source)
 
 1.  Clone this repository:
     ```bash
-    git clone https://github.com/jbeno/cursor-notebook-mcp.git # Or your fork
-    cd cursor-notebook-mcp
+    git clone https://github.com/svallory/the-notebook-mcp.git # Or your fork
+    cd the-notebook-mcp
     ```
 
 2.  Create and activate a virtual environment (recommended):
     ```bash
-    # Using Python's venv
-    python -m venv .venv
-    source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
-
-    # Or using uv (if installed)
-    # uv venv
-    # source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
+    # Using uv (recommended)
+    uv venv
+    source .venv/bin/activate # On Windows use `.venv\Scripts\activate`
     ```
 
 3.  Install in editable mode with all optional dependencies:
     ```bash
     # Includes SSE and Test dependencies
-    pip install -e ".[dev]"
+    # pip install -e ".[dev]"
+    uv pip install -e ".[dev]"
     
     # Or install just the base + SSE
     # pip install -e ".[sse]"
+    # uv pip install -e ".[sse]"
     
     # Or install just the base
     # pip install -e .
+    # uv pip install -e .
     ```
 
 ## Running the Server
 
 There are two main ways to run the server:
 
-### 1. Direct Execution (Recommended for Testing/Development)
+### 1. Using the Installed Script (Recommended after `pip install`)
 
-Activate your virtual environment and run the main script directly:
+If you have installed the package (even with `-e`), the `the-notebook-mcp` command should be available in your activated virtual environment:
 
 ```bash
 # stdio transport (default)
-python notebook_mcp_server.py --allow-root /path/to/notebooks
+the-notebook-mcp --allow-root /path/to/notebooks
 
 # sse transport
-python notebook_mcp_server.py --transport sse --allow-root /path/to/notebooks --host 127.0.0.1 --port 8080
+the-notebook-mcp --transport sse --allow-root /path/to/notebooks --host 0.0.0.0 --port 8889
 ```
 
-### 2. Using the Installed Script (After `pip install`)
+### 2. Direct Execution (Alternative / Development)
 
-If you have installed the package (even with `-e`), the `cursor-notebook-mcp` command should be available in your virtual environment:
+You can run the server's main script directly using the Python interpreter from your activated virtual environment. This is useful for development or if you haven't installed the package via `pip install -e .`.
 
-```bash
-# stdio transport
-cursor-notebook-mcp --allow-root /path/to/notebooks
+Choose one of the following methods:
 
-# sse transport
-cursor-notebook-mcp --transport sse --allow-root /path/to/notebooks --host 127.0.0.1 --port 8080
-```
+*   **Using `python -m` (Module Execution):** This is generally preferred as Python handles the path resolution. Run from anywhere:
+    ```bash
+    # stdio transport
+    python -m the_notebook_mcp.server --allow-root /path/to/notebooks
+
+    # sse transport
+    python -m the_notebook_mcp.server --transport sse --allow-root /path/to/notebooks --host 0.0.0.0 --port 8889
+    ```
+
+*   **Using `python <script_path>`:** Run from the project's root directory:
+    ```bash
+    # stdio transport
+    python the_notebook_mcp/server.py --allow-root /path/to/notebooks
+
+    # sse transport
+    python the_notebook_mcp/server.py --transport sse --allow-root /path/to/notebooks --host 0.0.0.0 --port 8889
+    ```
+
+**Note:** When using direct execution, ensure your current directory or Python environment is set up so that the `the_notebook_mcp` package and its dependencies can be found (activating the virtual environment usually handles this). The `python -m` method is less sensitive to the current directory.
 
 ## Cursor Integration (`mcp.json`)
 
@@ -165,8 +185,8 @@ See the sections below for configuring each transport type.
 
 If you choose to use `stdio` (where Cursor launches and manages the server process), you need to tell Cursor how to start the server using the `command` and `args` fields. **Care must be taken to ensure Cursor uses the correct Python environment containing this package and its dependencies.** There are two primary ways to configure the `command`:
 
-1.  **Use the installed script (Simplest `stdio` method):** Point `command` to the `cursor-notebook-mcp` script located in your virtual environment's `bin` directory (e.g., `.venv/bin/cursor-notebook-mcp`). This requires installing the package first.
-2.  **Use direct Python execution:** Set `command` to the path of the Python interpreter in your virtual environment (e.g., `.venv/bin/python`). Then, the *first* item in the `args` list must be the absolute path to the server script within the project (e.g., `/path/to/project/cursor_notebook_mcp/server.py`).
+1.  **Use the installed script (Simplest `stdio` method):** Point `command` to the `the-notebook-mcp` script located in your virtual environment's `bin` directory (e.g., `.venv/bin/the-notebook-mcp`). This requires installing the package first.
+2.  **Run via Python Module (Flexible):** Point `command` to your Python executable and use the `-m the_notebook_mcp.server.main` argument. This is useful if you haven't installed the package site-wide or are running from source.
 
 **Troubleshooting `stdio` Environment Issues:**
 
@@ -179,13 +199,13 @@ This ensures Cursor inherits the activated environment, which should then be pas
 
 **Example (using installed script method):**
 
-Make sure to replace `/absolute/path/to/venv/bin/cursor-notebook-mcp` and `/absolute/path/to/your/notebooks` with the correct paths for your system.
+Make sure to replace `/absolute/path/to/venv/bin/the-notebook-mcp` and `/absolute/path/to/your/notebooks` with the correct paths for your system.
 
 ```json
 {
   "mcpServers": {
     "notebook_mcp": {
-      "command": "/absolute/path/to/venv/bin/cursor-notebook-mcp",
+      "command": "/absolute/path/to/venv/bin/the-notebook-mcp",
       "args": [
         "--allow-root", "/absolute/path/to/your/notebooks"
       ]
@@ -201,7 +221,7 @@ Make sure to replace `/absolute/path/to/venv/bin/cursor-notebook-mcp` and `/abso
     "notebook_mcp": {
       "command": "/absolute/path/to/venv/bin/python",
       "args": [
-        "/absolute/path/to/project/cursor_notebook_mcp/server.py", 
+        "/absolute/path/to/project/the_notebook_mcp/server.py", 
         "--allow-root", "/absolute/path/to/your/notebooks"
       ]
     }
@@ -217,7 +237,7 @@ When using `sse`, you must run the server process manually first (see "Running t
 {
   "mcpServers": {
     "notebook_mcp": {
-      "url": "http://127.0.0.1:8080/sse"
+      "url": "http://127.0.0.1:8889/sse"
     }
   }
 }
@@ -267,14 +287,20 @@ For smooth collaboration with the AI agent on Jupyter Notebooks, you might want 
 
 The server accepts the following command-line arguments:
 
-*   `--allow-root`: (Required, can use multiple times) Absolute path to directory where notebooks are allowed.
-*   `--log-dir`: Directory to store log files. Defaults to `~/.cursor_notebook_mcp`.
-*   `--log-level`: Set the logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. Defaults to `INFO`.
-*   `--max-cell-source-size`: Maximum allowed size in bytes for cell source content. Defaults to 10 MiB.
-*   `--max-cell-output-size`: Maximum allowed size in bytes for cell output content. Defaults to 10 MiB.
-*   `--transport`: Transport type to use: `stdio` or `sse`. Defaults to `stdio`.
-*   `--host`: Host to bind the SSE server to. Only used with `--transport=sse`. Defaults to `127.0.0.1`.
-*   `--port`: Port to bind the SSE server to. Only used with `--transport=sse`. Defaults to `8080`.
+*   `--allow-root`: **Required.** Absolute path to a directory where notebooks are allowed. Can be used multiple times. Notebook operations outside these roots will be denied.
+
+Limits:
+*   `--max-cell-source-size`: Max bytes for cell source (default: 10MB).
+*   `--max-cell-output-size`: Max bytes for cell output (default: 10MB).
+
+Transport:
+*   `--transport`: `stdio` (default) or `sse`.
+*   `--host`: Host for SSE transport (default: `0.0.0.0`).
+*   `--port`: Port for SSE transport (default: `8889`).
+
+Logging:
+*   `--log-dir`: Directory to store log files. Defaults to `~/.the_notebook_mcp`.
+*   `--log-level`: `DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`.
 
 ## Security
 
@@ -298,9 +324,11 @@ The server accepts the following command-line arguments:
 
 1. Setup virtual environment and install dev dependencies:
    ```bash
-   python -m venv .venv
+   # python -m venv .venv
+   uv venv
    source .venv/bin/activate
-   pip install -e ".[dev]"
+   # pip install -e ".[dev]"
+   uv pip install -e ".[dev]"
    ```
 2. Run tests:
    ```bash
@@ -314,15 +342,9 @@ The server accepts the following command-line arguments:
 
 If you encounter any bugs or issues, please submit them to our GitHub issue tracker:
 
-1. Visit [jbeno/cursor-notebook-mcp](https://github.com/jbeno/cursor-notebook-mcp/issues)
+1. Visit [svallory/the-notebook-mcp](https://github.com/svallory/the-notebook-mcp/issues)
 2. Click on "New Issue"
-3. Provide:
-   - A clear description of the problem
-   - Steps to reproduce the issue
-   - Expected vs actual behavior
-   - Your environment details (OS, Python version, etc.)
-   - Any relevant error messages or logs
-   - Which model and client/version you're using
+3. Provide a clear title and description of the bug or feature request.
 
 ## Contributing
 
@@ -351,4 +373,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Author
 
-This project was created and is maintained by Jim Beno - jim@jimbeno.net
+This project is maintained by svallory. The original author is Jim Beno (see Acknowledgment section).

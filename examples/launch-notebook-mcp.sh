@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# This is a wrapper script for launching the Cursor Notebook MCP server
+# This is a wrapper script for launching the The Notebook MCP server
 # with the correct Python environment.
 #
 # Usage:
@@ -19,8 +19,8 @@ else
 fi
 
 # Launch the server with all arguments passed to this script
-# This assumes 'cursor-notebook-mcp' is installed in the activated venv or on the PATH
-cursor-notebook-mcp "$@"
+# This assumes 'the-notebook-mcp' is installed in the activated venv or on the PATH
+the-notebook-mcp "$@"
 
 # Alternatively, if running directly from source (and venv is active):
-# python /path/to/project/notebook_mcp_server.py "$@" 
+# python /path/to/project/notebook_mcp_server.py "$@"

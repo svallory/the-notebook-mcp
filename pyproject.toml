@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cursor-notebook-mcp"
-version = "0.2.3"
+name = "the-notebook-mcp"
+version = "0.7.0"
 authors = [
-  { name="Jim Beno", email="jim@jimbeno.net" },
+  { name="Saulo Vallory", email="me@saulo.engineer" },
 ]
 description = "Model Context Protocol (MCP) implementation for Jupyter notebooks to overcome limitation with Cursor"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-keywords = ["jupyter", "notebook", "mcp", "cursor", "ai", "agent", "nbformat", "ipynb"]
+keywords = ["jupyter", "notebook", "mcp", "cursor", "ai", "agent", "nbformat", "ipynb", "fastmcp"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Jupyter",
@@ -33,11 +33,13 @@ classifiers = [
     "Typing :: Typed"
 ]
 dependencies = [
-    "mcp>=0.1.0",
+    "fastmcp>=2.3.3",
     "nbformat>=5.0",
     "nbconvert>=6.0",
     "ipython",
     "jupyter_core",
+    "ruff>=0.11.9",
+    "loguru>=0.7.3",
 ]
 
 [project.optional-dependencies]
@@ -52,32 +54,32 @@ test = [
     "coveralls",
 ]
 dev = [
-    "cursor-notebook-mcp[sse,test]"
+    "the-notebook-mcp[sse,test]"
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/jbeno/cursor-notebook-mcp"
-"Bug Tracker" = "https://github.com/jbeno/cursor-notebook-mcp/issues"
-"Source" = "https://github.com/jbeno/cursor-notebook-mcp"
+"Homepage" = "https://github.com/jbeno/the-notebook-mcp"
+"Bug Tracker" = "https://github.com/jbeno/the-notebook-mcp/issues"
+"Source" = "https://github.com/jbeno/the-notebook-mcp"
 
 [project.scripts]
-cursor-notebook-mcp = "cursor_notebook_mcp.server:main"
+the-notebook-mcp = "the_notebook_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["cursor_notebook_mcp"]
+packages = ["the_notebook_mcp"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=cursor_notebook_mcp --cov-report=term-missing -m 'not slow'"
+addopts = "--cov=the_notebook_mcp --cov-report=term-missing -m 'not slow'"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["cursor_notebook_mcp"]
+source = ["the_notebook_mcp"]
 omit = [
     "*/__main__.py",
     "tests/*",
-    "cursor_notebook_mcp/__init__.py",
+    "the_notebook_mcp/__init__.py",
 ]
 
 [tool.coverage.report]
@@ -93,3 +95,11 @@ exclude_lines = [
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.34.0",
+]
+
+[tool.poe.tasks]
+start = "python -m the_notebook_mcp.server --allow-root $POE_PWD"

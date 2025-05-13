@@ -6,12 +6,10 @@ receive necessary configuration (like allowed roots) explicitly.
 """
 
 import os
-import logging
 from typing import List
 
 import nbformat
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 def is_path_allowed(target_path: str, allowed_roots: List[str]) -> bool:
     """Checks if the target path is within one of the allowed roots."""
@@ -32,11 +30,13 @@ def is_path_allowed(target_path: str, allowed_roots: List[str]) -> bool:
             abs_allowed_root = os.path.realpath(allowed_root)
             if abs_target_path.startswith(abs_allowed_root + os.sep) or abs_target_path == abs_allowed_root:
                 # os.path.commonpath might be another option but startswith is often clearer
+                logger.trace(f"Path '{abs_target_path}' allowed within root '{abs_allowed_root}'")
                 return True
         except Exception as e:
             logger.error(f"Error resolving allowed root '{allowed_root}': {e}")
             continue # Try the next root
 
+    logger.warning(f"Security check failed: Path '{abs_target_path}' is outside allowed roots: {allowed_roots}")
     return False
 
 async def read_notebook(
@@ -51,7 +51,8 @@ async def read_notebook(
 
     # Core Security Check: Validate against allowed roots
     if not is_path_allowed(notebook_path, allowed_roots):
-        logger.error(f"Security Violation: Attempted access outside allowed roots: {notebook_path}")
+        # Error/Warning already logged by is_path_allowed
+        # logger.error(f"Security Violation: Attempted access outside allowed roots: {notebook_path}")
         raise PermissionError(f"Access denied: Path '{notebook_path}' is outside the allowed workspace roots.")
 
     # Basic check for .ipynb extension
@@ -86,7 +87,8 @@ async def write_notebook(
 
     # Core Security Check: Validate against allowed roots
     if not is_path_allowed(notebook_path, allowed_roots):
-         logger.error(f"Security Violation: Attempted write outside allowed roots: {notebook_path}")
+         # Error/Warning already logged by is_path_allowed
+         # logger.error(f"Security Violation: Attempted write outside allowed roots: {notebook_path}")
          raise PermissionError(f"Access denied: Path '{notebook_path}' is outside the allowed workspace roots.")
 
     # Use the resolved path for file system operations

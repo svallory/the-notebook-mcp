@@ -146,9 +146,13 @@ logs/
 *.temp
 *.tmp
 
-# Specific to this project
-/cursor_notebook_mcp_*.log # Old log file names if any
-/.cursor_notebook_mcp/ # Log directory
+# Log files specific to this project
+/the_notebook_mcp_*.log # Old log file names if any
+/.the_notebook_mcp/ # Log directory
+
+# Coverage data
+*.cover
+*.py,cover
 
 # If you have secrets, add them here, e.g.:
 # .envrc
