@@ -4,6 +4,7 @@ from loguru import logger
 from ..core import notebook_ops
 from ..core.config import ServerConfig
 
+
 class MetadataToolsProvider:
     """Provides tools for reading and writing notebook and cell metadata."""
 
@@ -23,20 +24,37 @@ class MetadataToolsProvider:
         Returns:
             A dictionary containing the notebook's metadata.
         """
-        logger.debug(f"[Tool: notebook_read_metadata] Called. Args: path={notebook_path}")
+        logger.debug(
+            f"[Tool: notebook_read_metadata] Called. Args: path={notebook_path}"
+        )
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             metadata = nb.metadata
-            logger.info(f"[Tool: notebook_read_metadata] SUCCESS - Read notebook metadata from {notebook_path}.", tool_success=True)
-            return dict(metadata) # Return a copy as a plain dict
-        except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError) as e:
+            logger.info(
+                f"[Tool: notebook_read_metadata] SUCCESS - Read notebook metadata from {notebook_path}.",
+                tool_success=True,
+            )
+            return dict(metadata)  # Return a copy as a plain dict
+        except (
+            PermissionError,
+            FileNotFoundError,
+            ValueError,
+            nbformat.validator.ValidationError,
+            IOError,
+        ) as e:
             logger.error(f"[Tool: notebook_read_metadata] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_read_metadata] FAILED - Unexpected error: {e}")
-            raise RuntimeError(f"An unexpected error occurred while reading notebook metadata: {e}") from e
+            logger.exception(
+                f"[Tool: notebook_read_metadata] FAILED - Unexpected error: {e}"
+            )
+            raise RuntimeError(
+                f"An unexpected error occurred while reading notebook metadata: {e}"
+            ) from e
 
-    async def notebook_edit_metadata(self, notebook_path: str, metadata_updates: dict) -> str:
+    async def notebook_edit_metadata(
+        self, notebook_path: str, metadata_updates: dict
+    ) -> str:
         """Updates the top-level metadata of a Jupyter Notebook.
 
         Args:
@@ -47,7 +65,9 @@ class MetadataToolsProvider:
         Returns:
             A success message string.
         """
-        logger.debug(f"[Tool: notebook_edit_metadata] Called. Args: path={notebook_path}, updates={metadata_updates}")
+        logger.debug(
+            f"[Tool: notebook_edit_metadata] Called. Args: path={notebook_path}, updates={metadata_updates}"
+        )
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
 
@@ -59,11 +79,15 @@ class MetadataToolsProvider:
                 if value is None:
                     if key in nb.metadata:
                         del nb.metadata[key]
-                        logger.trace(f"[Tool: notebook_edit_metadata] Removed metadata key: {key}")
+                        logger.trace(
+                            f"[Tool: notebook_edit_metadata] Removed metadata key: {key}"
+                        )
                 else:
                     # Consider validating value type/size here if necessary
                     nb.metadata[key] = value
-                    logger.trace(f"[Tool: notebook_edit_metadata] Updated metadata key: {key}")
+                    logger.trace(
+                        f"[Tool: notebook_edit_metadata] Updated metadata key: {key}"
+                    )
 
             # Validate size after update (if applicable, requires serializing)
             # serialized_meta = json.dumps(nb.metadata)
@@ -71,17 +95,32 @@ class MetadataToolsProvider:
             #     raise ValueError("Updated metadata exceeds maximum allowed size.")
 
             await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
-            logger.info(f"[Tool: notebook_edit_metadata] SUCCESS - Updated notebook metadata for {notebook_path}.", tool_success=True)
+            logger.info(
+                f"[Tool: notebook_edit_metadata] SUCCESS - Updated notebook metadata for {notebook_path}.",
+                tool_success=True,
+            )
             return "Successfully updated notebook metadata."
 
-        except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError) as e:
+        except (
+            PermissionError,
+            FileNotFoundError,
+            ValueError,
+            nbformat.validator.ValidationError,
+            IOError,
+        ) as e:
             logger.error(f"[Tool: notebook_edit_metadata] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_edit_metadata] FAILED - Unexpected error: {e}")
-            raise RuntimeError(f"An unexpected error occurred while editing notebook metadata: {e}") from e
+            logger.exception(
+                f"[Tool: notebook_edit_metadata] FAILED - Unexpected error: {e}"
+            )
+            raise RuntimeError(
+                f"An unexpected error occurred while editing notebook metadata: {e}"
+            ) from e
 
-    async def notebook_read_cell_metadata(self, notebook_path: str, cell_index: int) -> dict:
+    async def notebook_read_cell_metadata(
+        self, notebook_path: str, cell_index: int
+    ) -> dict:
         """Reads the metadata of a specific cell in a Jupyter Notebook.
 
         Args:
@@ -91,25 +130,45 @@ class MetadataToolsProvider:
         Returns:
             A dictionary containing the cell's metadata.
         """
-        logger.debug(f"[Tool: notebook_read_cell_metadata] Called. Args: path={notebook_path}, index={cell_index}")
+        logger.debug(
+            f"[Tool: notebook_read_cell_metadata] Called. Args: path={notebook_path}, index={cell_index}"
+        )
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
-                raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
+                raise IndexError(
+                    f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1})."
+                )
 
             cell = nb.cells[cell_index]
             metadata = cell.metadata
-            logger.info(f"[Tool: notebook_read_cell_metadata] SUCCESS - Read cell {cell_index} metadata from {notebook_path}.", tool_success=True)
-            return dict(metadata) # Return a copy as a plain dict
+            logger.info(
+                f"[Tool: notebook_read_cell_metadata] SUCCESS - Read cell {cell_index} metadata from {notebook_path}.",
+                tool_success=True,
+            )
+            return dict(metadata)  # Return a copy as a plain dict
 
-        except (PermissionError, FileNotFoundError, IndexError, ValueError, nbformat.validator.ValidationError, IOError) as e:
+        except (
+            PermissionError,
+            FileNotFoundError,
+            IndexError,
+            ValueError,
+            nbformat.validator.ValidationError,
+            IOError,
+        ) as e:
             logger.error(f"[Tool: notebook_read_cell_metadata] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_read_cell_metadata] FAILED - Unexpected error: {e}")
-            raise RuntimeError(f"An unexpected error occurred while reading cell metadata: {e}") from e
+            logger.exception(
+                f"[Tool: notebook_read_cell_metadata] FAILED - Unexpected error: {e}"
+            )
+            raise RuntimeError(
+                f"An unexpected error occurred while reading cell metadata: {e}"
+            ) from e
 
-    async def notebook_edit_cell_metadata(self, notebook_path: str, cell_index: int, metadata_updates: dict) -> str:
+    async def notebook_edit_cell_metadata(
+        self, notebook_path: str, cell_index: int, metadata_updates: dict
+    ) -> str:
         """Updates the metadata of a specific cell in a Jupyter Notebook.
 
         Args:
@@ -121,11 +180,15 @@ class MetadataToolsProvider:
         Returns:
             A success message string.
         """
-        logger.debug(f"[Tool: notebook_edit_cell_metadata] Called. Args: path={notebook_path}, index={cell_index}, updates={metadata_updates}")
+        logger.debug(
+            f"[Tool: notebook_edit_cell_metadata] Called. Args: path={notebook_path}, index={cell_index}, updates={metadata_updates}"
+        )
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
-                raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
+                raise IndexError(
+                    f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1})."
+                )
 
             cell = nb.cells[cell_index]
 
@@ -136,24 +199,43 @@ class MetadataToolsProvider:
                 if value is None:
                     if key in cell.metadata:
                         del cell.metadata[key]
-                        logger.trace(f"[Tool: notebook_edit_cell_metadata] Removed cell metadata key: {key}")
+                        logger.trace(
+                            f"[Tool: notebook_edit_cell_metadata] Removed cell metadata key: {key}"
+                        )
                 else:
                     # Consider validating value type/size here if necessary
                     cell.metadata[key] = value
-                    logger.trace(f"[Tool: notebook_edit_cell_metadata] Updated cell metadata key: {key}")
+                    logger.trace(
+                        f"[Tool: notebook_edit_cell_metadata] Updated cell metadata key: {key}"
+                    )
 
             # Validate overall cell size after update? (More complex)
 
             await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
-            logger.info(f"[Tool: notebook_edit_cell_metadata] SUCCESS - Updated metadata for cell {cell_index} in {notebook_path}.", tool_success=True)
+            logger.info(
+                f"[Tool: notebook_edit_cell_metadata] SUCCESS - Updated metadata for cell {cell_index} in {notebook_path}.",
+                tool_success=True,
+            )
             return f"Successfully updated metadata for cell {cell_index}."
 
-        except (PermissionError, FileNotFoundError, IndexError, ValueError, nbformat.validator.ValidationError, IOError) as e:
+        except (
+            PermissionError,
+            FileNotFoundError,
+            IndexError,
+            ValueError,
+            nbformat.validator.ValidationError,
+            IOError,
+        ) as e:
             logger.error(f"[Tool: notebook_edit_cell_metadata] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_edit_cell_metadata] FAILED - Unexpected error: {e}")
-            raise RuntimeError(f"An unexpected error occurred while editing cell metadata: {e}") from e
+            logger.exception(
+                f"[Tool: notebook_edit_cell_metadata] FAILED - Unexpected error: {e}"
+            )
+            raise RuntimeError(
+                f"An unexpected error occurred while editing cell metadata: {e}"
+            ) from e
+
 
 # Remove original placeholder comments
-# ... existing code ... 
+# ... existing code ...

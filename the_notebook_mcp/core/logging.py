@@ -3,6 +3,7 @@ import os
 import logging
 from loguru import logger
 
+
 class InterceptHandler(logging.Handler):
     """
     Redirects standard logging messages to Loguru.
@@ -15,6 +16,7 @@ class InterceptHandler(logging.Handler):
     It determines the appropriate Loguru level and finds the correct
     call frame to report the origin of the log message accurately.
     """
+
     def emit(self, record: logging.LogRecord) -> None:
         """
         Emits a log record through Loguru.
@@ -31,8 +33,11 @@ class InterceptHandler(logging.Handler):
         while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        
-        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
 
 def log_formatter(record: dict) -> str:
     """
@@ -49,23 +54,26 @@ def log_formatter(record: dict) -> str:
         The formatted log string.
     """
     if record["extra"].get("literal"):
-        return '{message}'
-    
+        return "{message}"
+
     if record["level"].name == "INFO":
         return "<level>{level: <7}</level> <dim>|</dim> {message}\n"
-    
+
     message_color = "white"
-    
+
     if record["level"].name == "ERROR" or record["level"].name == "CRITICAL":
         message_color = "red"
-        
+
     return (
         "<level>{level: <7}</level> <dim>|</dim> "
         "<light-green>{name}:{module}:{line} ({function})</light-green> - "
         f"<{message_color}>{{message}}</{message_color}>\n{{exception}}"
     )
 
-def setup_logging(log_dir_path: str, log_level_str: str, in_prod_like_env: bool = False) -> None:
+
+def setup_logging(
+    log_dir_path: str, log_level_str: str, in_prod_like_env: bool = False
+) -> None:
     """
     Configures Loguru handlers for console and file logging.
 
@@ -78,7 +86,7 @@ def setup_logging(log_dir_path: str, log_level_str: str, in_prod_like_env: bool 
        and backtraces/diagnostics.
     4. Intercepting messages from the standard Python `logging` module and
        redirecting them through Loguru using `InterceptHandler`.
-    
+
     The `in_prod_like_env` parameter is available for future use, e.g., to
     further adjust verbosity or features in production-like environments.
 
@@ -101,7 +109,7 @@ def setup_logging(log_dir_path: str, log_level_str: str, in_prod_like_env: bool 
         format=log_formatter,
         colorize=True,
         backtrace=True,
-        diagnose=is_debug_or_trace
+        diagnose=is_debug_or_trace,
     )
 
     if log_dir_path:
@@ -115,16 +123,20 @@ def setup_logging(log_dir_path: str, log_level_str: str, in_prod_like_env: bool 
                 rotation="10 MB",
                 retention="7 days",
                 enqueue=True,
-                encoding='utf-8',
+                encoding="utf-8",
                 backtrace=True,  # Show full exception stack traces for file log as well
-                diagnose=True,   # Always enable diagnose for DEBUG file log
+                diagnose=True,  # Always enable diagnose for DEBUG file log
             )
-            
+
             logger.debug(f"File logging enabled: {log_file_path}")
         except OSError as e:
-            logger.error(f"Could not create log directory or file {log_dir_path}: {e}. File logging disabled.")
+            logger.error(
+                f"Could not create log directory or file {log_dir_path}: {e}. File logging disabled."
+            )
     else:
         logger.warning("No log directory specified. File logging disabled.")
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-    logger.debug(f"Logging initialized. Console level: {console_log_level}. Intercepting standard logging.") 
+    logger.debug(
+        f"Logging initialized. Console level: {console_log_level}. Intercepting standard logging."
+    )
