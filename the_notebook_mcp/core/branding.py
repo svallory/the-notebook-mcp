@@ -10,6 +10,9 @@ Handles server branding, including ASCII art and startup messages.
 # Simple ANSI color codes could also be used if Loguru tag processing is an issue
 # in some contexts, but tags are generally preferred with Loguru.
 
+from the_notebook_mcp.core.config import ServerConfig
+
+
 def get_ascii_banner() -> dict:
     """
     Generates a colored ASCII art banner for "The Notebook MCP".
@@ -34,10 +37,7 @@ def get_ascii_banner() -> dict:
     }
 
 def get_server_startup_message(
-    server_version: str,
-    host: str = None,
-    port: int = None,
-    transport: str = "stdio"
+    config: ServerConfig = None
 ) -> str:
     """
     Generates a formatted startup message with ASCII art and connection details.
@@ -56,28 +56,38 @@ def get_server_startup_message(
     banner = get_ascii_banner()
     
     # Center version string after the banner
-    version_str = f"Version {server_version}"
+    version_str = f"Version {config.version}"
     padding_left = (banner['width'] - len(version_str)) // 2
     centered_version = " " * padding_left + version_str
     
+    box_width = banner['width'] - 2
+    directories = "\n".join([
+        f"│  - {dir_path} {"" :<{box_width - len(dir_path) - 5}}│" 
+        for dir_path in config.allow_root_dirs
+    ])
+    
     # Format connection information based on transport
-    if transport == "stdio":
+    if config.transport == "stdio":
         connection_box = f"""
-╭{"─" * (banner['width'] - 2)}╮
-│ Transport: STDIO {"" :<{banner['width'] - 21}} │
-│ <green>Server running</green> <yellow>{"Press Ctrl+D to exit":>40}</yellow> │
-╰{"─" * (banner['width'] - 2)}╯
+╭{"─" * box_width}╮
+│ <green>Server running</green> <dim>stdio</dim> <yellow>{"Press Ctrl+D to exit":>34}</yellow> │
+│{ " " * box_width }│
+│{ " root directories:" :<{box_width}}│
+{ directories }
+╰{"─" * box_width}╯
 """
     else:
         # HTTP-based transports (streamable-http or sse)
-        url = f"http://{host}:{port}"
-        transport_name = "Streamable HTTP" if transport == "streamable-http" else "Server-Sent Events (SSE)"
+        url = f"http://{config.host}:{config.port}"
+        transport_name = "Streamable HTTP" if config.transport == "streamable-http" else "SSE"
         connection_box = f"""
-╭{"─" * (banner['width'] - 2)}╮
-│ Transport: {transport_name}{"" :<{banner['width'] - 15 - len(transport_name)}} │
-│ Server URL: {url}{"" :<{banner['width'] - 16 - len(url)}} │
-│ <green>Server running</green> <yellow>{"Press <lr>Ctrl+C</lr> to exit":>49}</yellow> │
-╰{"─" * (banner['width'] - 2)}╯
+╭{ "─" * box_width }╮
+│ <green>Server running</green> <dim>{transport_name}</dim> <yellow>{"Press <lr>Ctrl+C</lr> to exit":>{box_width - len(transport_name) - 9}}</yellow> │
+│ URL: <underline>{url}</underline> {"" :<{box_width - len(url) - 8}} │
+│{ " " * box_width }│
+│ root directories: {"" :<{box_width - 20}} │
+{ directories }
+╰{ "─" * box_width }╯
 """
 
     # Combine the ASCII art, centered version and connection box

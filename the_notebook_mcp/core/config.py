@@ -21,6 +21,7 @@ class ServerConfig:
         host (str): Host to bind to (default: 0.0.0.0), used for HTTP transports.
         port (int): Port to bind to (default: 8889), used for HTTP transports.
         path (str): URL path for MCP endpoint, used for HTTP transports.
+        command (str): Command for the server.
     """
     
     # Valid transport options
@@ -31,9 +32,10 @@ class ServerConfig:
         Initialize configuration from command-line arguments or defaults.
         
         Args:
-            args: Parsed command-line arguments.
+            args: Parsed command-line arguments. If None, only defaults are set and no validation is performed.
         """
         # Set default values
+        self.command = None
         self.version = __version__  # Use version from package
         self.allow_root_dirs = []
         self.max_cell_source_size = 10 * 1024 * 1024  # 10 MiB
@@ -41,16 +43,16 @@ class ServerConfig:
         self.log_dir = os.path.expanduser("~/.the-notebook-mcp")
         self.log_level = "INFO"
         self.transport = "stdio"  # Default transport
-        self.host = "127.0.0.1"   # Changed default to localhost
+        self.host = "0.0.0.0"   # Changed default to localhost
         self.port = 8889
         self.path = "/mcp"        # Default path for HTTP transports
         
         # Apply parsed arguments if provided
         if args:
+            if hasattr(args, 'command'): # Store the command first
+                self.command = args.command
             self._apply_args(args)
-        
-        # Validate configuration
-        self._validate()
+            self._validate() # Validate only if args are provided
         
     def _apply_args(self, args: argparse.Namespace):
         """
@@ -60,7 +62,9 @@ class ServerConfig:
             args: Parsed command-line arguments.
         """
         # Copy values from args
-        if hasattr(args, 'allow_root'):
+        if hasattr(args, 'allow_root_dirs'):
+            self.allow_root_dirs = args.allow_root_dirs
+        elif hasattr(args, 'allow_root'): # Fallback for singular form if present
             self.allow_root_dirs = args.allow_root
         
         if hasattr(args, 'max_cell_source_size'):
@@ -94,17 +98,19 @@ class ServerConfig:
         Raises:
             ValueError: If any configuration values are invalid.
         """
-        # Check that allow_root_dirs is populated
-        if not self.allow_root_dirs:
-            raise ValueError("At least one --allow-root must be specified")
+        # Check that allow_root_dirs is populated only for the 'start' command
+        if self.command == "start" and not self.allow_root_dirs:
+            raise ValueError("At least one --allow-root must be specified for the 'start' command")
         
         # Validate all allow_root_dirs are absolute paths and exist
-        for dir_path in self.allow_root_dirs:
-            if not os.path.isabs(dir_path):
-                raise ValueError(f"--allow-root must be an absolute path: {dir_path}")
+        # Only validate if allow_root_dirs is not empty (e.g. for 'start' command)
+        if self.allow_root_dirs:
+            for dir_path in self.allow_root_dirs:
+                if not os.path.isabs(dir_path):
+                    raise ValueError(f"--allow-root must be an absolute path: {dir_path}")
             
-            if not os.path.isdir(dir_path):
-                raise ValueError(f"--allow-root directory does not exist: {dir_path}")
+                if not os.path.isdir(dir_path):
+                    raise ValueError(f"--allow-root directory does not exist: {dir_path}")
         
         # Check that max_cell_source_size is positive
         if self.max_cell_source_size <= 0:

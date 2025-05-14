@@ -31,7 +31,7 @@ class InfoToolsProvider:
         logger.debug(f"[Tool: notebook_read] Called. Args: path={notebook_path}") # Changed to DEBUG
         try:
             # Security check happens within read_notebook
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
 
             # --- Size Check (Optional, but good practice) ---
             # Example: Check total notebook size if needed, though read_notebook might handle internal limits.
@@ -60,7 +60,7 @@ class InfoToolsProvider:
         """
         logger.debug(f"[Tool: notebook_read_cell] Called. Args: path={notebook_path}, index={cell_index}") # Changed to DEBUG
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -92,7 +92,7 @@ class InfoToolsProvider:
         """
         logger.debug(f"[Tool: notebook_get_cell_count] Called. Args: path={notebook_path}") # Changed to DEBUG
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             count = len(nb.cells)
             logger.info(f"[Tool: notebook_get_cell_count] SUCCESS - Notebook {notebook_path} has {count} cells.", tool_success=True) # Changed to INFO, added extra context
             return count
@@ -118,7 +118,7 @@ class InfoToolsProvider:
             # Basic path validation first
             if not os.path.isabs(notebook_path):
                  raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
-            if not self.is_path_allowed(notebook_path, self.config.allowed_roots):
+            if not self.is_path_allowed(notebook_path, self.config.allow_root_dirs):
                  raise PermissionError("Access denied: Path is outside the allowed workspace roots.")
             if not notebook_path.endswith(".ipynb"):
                  raise ValueError("Invalid file type: Path must point to a .ipynb file.")
@@ -137,7 +137,7 @@ class InfoToolsProvider:
             }
 
             # Read notebook for cell count and format info
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots) # Use original path
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs) # Use original path
             notebook_info = {
                 "cell_count": len(nb.cells),
                 "nbformat": nb.nbformat,
@@ -172,7 +172,7 @@ class InfoToolsProvider:
         logger.debug(f"[Tool: notebook_get_outline] Called. Args: path={notebook_path}") # Changed to DEBUG
         outline = []
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             for i, cell in enumerate(nb.cells):
                 source = cell.get('source', '')
                 cell_type = cell.cell_type
@@ -239,7 +239,7 @@ class InfoToolsProvider:
         logger.debug(f"[Tool: notebook_search] Called. Args: path={notebook_path}, query_len={len(query)}, case_sensitive={case_sensitive}") # Changed to DEBUG
         matches = []
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             search_query = query if case_sensitive else query.lower()
 
             for i, cell in enumerate(nb.cells):

@@ -7,6 +7,7 @@ import subprocess
 from loguru import logger
 
 import nbformat
+import jsonschema
 
 # Import necessary components
 from ..core.config import ServerConfig
@@ -35,7 +36,7 @@ class FileToolsProvider:
             if not os.path.isabs(notebook_path):
                  raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
             # Use imported notebook_ops.is_path_allowed
-            if not notebook_ops.is_path_allowed(notebook_path, self.config.allowed_roots):
+            if not notebook_ops.is_path_allowed(notebook_path, self.config.allow_root_dirs):
                  raise PermissionError("Access denied: Path is outside the allowed workspace roots.")
 
             resolved_path = os.path.realpath(notebook_path)
@@ -47,7 +48,7 @@ class FileToolsProvider:
             # --- Create and Write --- 
             nb = nbformat.v4.new_notebook()
             # Use imported notebook_ops.write_notebook
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             
             logger.info(f"[Tool: notebook_create] SUCCESS - Created new notebook at {resolved_path}", tool_success=True)
             return f"Successfully created new notebook: {notebook_path}"
@@ -72,7 +73,7 @@ class FileToolsProvider:
             # Security Checks
             if not os.path.isabs(notebook_path):
                 raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
-            if not notebook_ops.is_path_allowed(notebook_path, self.config.allowed_roots):
+            if not notebook_ops.is_path_allowed(notebook_path, self.config.allow_root_dirs):
                 raise PermissionError("Access denied: Path is outside the allowed workspace roots.")
             if not notebook_path.endswith(".ipynb"):
                 raise ValueError("Invalid file type: Path must point to a .ipynb file.")
@@ -110,8 +111,8 @@ class FileToolsProvider:
             # Security Checks
             if not os.path.isabs(old_path) or not os.path.isabs(new_path):
                 raise ValueError("Invalid notebook path(s): Only absolute paths are allowed.")
-            if not notebook_ops.is_path_allowed(old_path, self.config.allowed_roots) or \
-               not notebook_ops.is_path_allowed(new_path, self.config.allowed_roots):
+            if not notebook_ops.is_path_allowed(old_path, self.config.allow_root_dirs) or \
+               not notebook_ops.is_path_allowed(new_path, self.config.allow_root_dirs):
                 raise PermissionError("Access denied: One or both paths are outside the allowed workspace roots.")
             if not old_path.endswith(".ipynb") or not new_path.endswith(".ipynb"):
                 raise ValueError("Invalid file type: Both paths must point to .ipynb files.")
@@ -153,10 +154,12 @@ class FileToolsProvider:
         """
         logger.debug(f"[Tool: notebook_validate] Called. Args: path={notebook_path}")
         try:
-            await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
-            logger.info("[Tool: notebook_validate] SUCCESS - Notebook format is valid.", tool_success=True)
+            # This will raise ValidationError if invalid
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
+            nbformat.validate(nb) # Explicitly validate after reading
+            logger.info(f"[Tool: notebook_validate] SUCCESS - Notebook format is valid.")
             return "Notebook format is valid."
-        except nbformat.validator.ValidationError as e:
+        except (nbformat.validator.ValidationError, jsonschema.exceptions.ValidationError) as e:
             logger.error(f"[Tool: notebook_validate] FAILED - Notebook validation error: {e}")
             return f"Notebook validation failed: {e}"
         except (PermissionError, FileNotFoundError, ValueError, IOError) as e:
@@ -187,8 +190,8 @@ class FileToolsProvider:
             # --- Security Checks --- 
             if not os.path.isabs(notebook_path) or not os.path.isabs(output_path):
                  raise ValueError("Invalid path(s): Only absolute paths are allowed.")
-            if not notebook_ops.is_path_allowed(notebook_path, self.config.allowed_roots) or \
-               not notebook_ops.is_path_allowed(output_path, self.config.allowed_roots):
+            if not notebook_ops.is_path_allowed(notebook_path, self.config.allow_root_dirs) or \
+               not notebook_ops.is_path_allowed(output_path, self.config.allow_root_dirs):
                  raise PermissionError("Access denied: One or both paths are outside the allowed workspace roots.")
             if not notebook_path.endswith(".ipynb"):
                 raise ValueError("Invalid source file type: Must be a .ipynb file.")
@@ -228,17 +231,51 @@ class FileToolsProvider:
 
             if not os.path.isfile(resolved_output_path):
                  expected_dir = os.path.dirname(resolved_output_path)
-                 base_name = os.path.splitext(os.path.basename(resolved_output_path))[0]
-                 possible_output = os.path.join(expected_dir, f"{base_name}.{export_format}")
-                 if os.path.isfile(possible_output):
-                     logger.warning(f"[Tool: notebook_export] nbconvert created {possible_output} instead of requested {resolved_output_path}. Renaming.")
+                 base_name_orig_output = os.path.splitext(os.path.basename(resolved_output_path))[0]
+                 
+                 # nbconvert might append its own default extension, esp. for 'python'
+                 # e.g. --output foo.python --to python -> foo.py (not foo.python.py)
+                 # or --output foo --to python -> foo.py
+                 # if --output foo.bar --to python -> foo.bar.py (treats foo.bar as basename)
+
+                 # Default expected name if nbconvert respects our full output_path
+                 possible_output_paths = [resolved_output_path]
+
+                 # If export_format is python, nbconvert might take the given output path as a stem and add .py
+                 if export_format == 'python':
+                    possible_output_paths.append(resolved_output_path + ".py")
+                 elif export_format == 'markdown':
+                    possible_output_paths.append(resolved_output_path + ".md")
+
+                 # Check if nbconvert used the basename of output_path and added its default extension
+                 # e.g. if output_path = /d/file.script and format = 'python', check for /d/file.py
+                 if export_format == 'python':
+                    possible_output_paths.append(os.path.join(expected_dir, base_name_orig_output + ".py"))
+                 else:
+                    # For other formats, it might create base_name.export_format
+                    possible_output_paths.append(os.path.join(expected_dir, f"{base_name_orig_output}.{export_format}"))
+
+                 # Also consider if nbconvert just used the source notebook's basename in the output_dir
+                 source_basename = os.path.splitext(os.path.basename(resolved_source_path))[0]
+                 possible_output_paths.append(os.path.join(expected_dir, f"{source_basename}.{export_format}"))
+                 if export_format == 'python': # And python specific for source basename
+                    possible_output_paths.append(os.path.join(expected_dir, f"{source_basename}.py"))
+
+                 found_path = None
+                 for p_path in possible_output_paths:
+                     if os.path.isfile(p_path):
+                         found_path = p_path
+                         break
+
+                 if found_path and found_path != resolved_output_path:
+                     logger.warning(f"[Tool: notebook_export] nbconvert created {found_path} instead of requested {resolved_output_path}. Renaming.")
                      try:
-                         os.rename(possible_output, resolved_output_path)
+                         os.rename(found_path, resolved_output_path)
                      except OSError as rename_err:
                          logger.error(f"[Tool: notebook_export] FAILED - Could not rename nbconvert output: {rename_err}")
-                         raise IOError(f"nbconvert created output at {possible_output}, but failed to rename to {resolved_output_path}: {rename_err}") from rename_err
-                 else:
-                     error_message = f"nbconvert completed but output file not found at expected path: {resolved_output_path} or variations."
+                         raise IOError(f"nbconvert created output at {found_path}, but failed to rename to {resolved_output_path}: {rename_err}") from rename_err
+                 elif not os.path.isfile(resolved_output_path): # Check again after potential rename
+                     error_message = f"nbconvert completed but output file not found at expected path: {resolved_output_path} or variations tried: {possible_output_paths}."
                      logger.error(f"[Tool: notebook_export] FAILED - {error_message}\nnbconvert stdout: {process.stdout}\nnbconvert stderr: {process.stderr}")
                      raise FileNotFoundError(error_message)
 

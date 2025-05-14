@@ -24,7 +24,7 @@ class MetadataToolsProvider:
         """
         logger.debug(f"[Tool: notebook_read_metadata] Called. Args: path={notebook_path}")
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             metadata = nb.metadata
             logger.info(f"[Tool: notebook_read_metadata] SUCCESS - Read notebook metadata from {notebook_path}.", tool_success=True)
             return dict(metadata) # Return a copy as a plain dict
@@ -48,7 +48,7 @@ class MetadataToolsProvider:
         """
         logger.debug(f"[Tool: notebook_edit_metadata] Called. Args: path={notebook_path}, updates={metadata_updates}")
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
 
             # --- Metadata Size Check (Optional but recommended) ---
             # Calculate potential size increase/decrease before modifying?
@@ -69,7 +69,7 @@ class MetadataToolsProvider:
             # if len(serialized_meta.encode('utf-8')) > MAX_METADATA_SIZE:
             #     raise ValueError("Updated metadata exceeds maximum allowed size.")
 
-            await self.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_edit_metadata] SUCCESS - Updated notebook metadata for {notebook_path}.", tool_success=True)
             return "Successfully updated notebook metadata."
 
@@ -92,7 +92,7 @@ class MetadataToolsProvider:
         """
         logger.debug(f"[Tool: notebook_read_cell_metadata] Called. Args: path={notebook_path}, index={cell_index}")
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -122,7 +122,7 @@ class MetadataToolsProvider:
         """
         logger.debug(f"[Tool: notebook_edit_cell_metadata] Called. Args: path={notebook_path}, index={cell_index}, updates={metadata_updates}")
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -143,7 +143,7 @@ class MetadataToolsProvider:
 
             # Validate overall cell size after update? (More complex)
 
-            await self.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_edit_cell_metadata] SUCCESS - Updated metadata for cell {cell_index} in {notebook_path}.", tool_success=True)
             return f"Successfully updated metadata for cell {cell_index}."
 

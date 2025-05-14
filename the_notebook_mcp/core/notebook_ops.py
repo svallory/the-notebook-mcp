@@ -67,8 +67,8 @@ async def read_notebook(
     try:
         logger.debug(f"Reading notebook from: {resolved_path}")
         # Read using the resolved path
-        # Consider adding encoding='utf-8' explicitly
-        nb = nbformat.read(resolved_path, as_version=4)
+        with open(resolved_path, 'r', encoding='utf-8') as f:
+            nb = nbformat.read(f, as_version=4)
         logger.debug(f"Successfully read notebook: {resolved_path}")
         return nb
     except Exception as e:
@@ -77,39 +77,35 @@ async def read_notebook(
 
 async def write_notebook(
     notebook_path: str,
-    nb: nbformat.NotebookNode,
+    nb_node: nbformat.NotebookNode,
     allowed_roots: List[str],
+    max_notebook_size: int = 10 * 1024 * 1024 # Default 10MB, should come from config eventually
 ):
-    """Writes a notebook file safely, ensuring it's within allowed roots."""
+    """Writes a notebook node to a file safely."""
     if not os.path.isabs(notebook_path):
-         logger.error(f"Security Risk: Received non-absolute path for writing: {notebook_path}")
-         raise ValueError("Invalid notebook path: Only absolute paths are allowed for writing.")
+        logger.error(f"Security Risk: Received non-absolute path for writing: {notebook_path}")
+        raise ValueError("Invalid notebook path: Only absolute paths are allowed for writing.")
 
-    # Core Security Check: Validate against allowed roots
     if not is_path_allowed(notebook_path, allowed_roots):
-         # Error/Warning already logged by is_path_allowed
-         # logger.error(f"Security Violation: Attempted write outside allowed roots: {notebook_path}")
-         raise PermissionError(f"Access denied: Path '{notebook_path}' is outside the allowed workspace roots.")
+        raise PermissionError(f"Access denied: Path '{notebook_path}' is outside the allowed workspace roots for writing.")
 
-    # Use the resolved path for file system operations
+    if not notebook_path.endswith(".ipynb"):
+        raise ValueError(f"Invalid file type: '{notebook_path}' must point to a .ipynb file for writing.")
+    
+    # Resolve the path before writing to ensure canonical path for checks
     resolved_path = os.path.realpath(notebook_path)
-    if not resolved_path.endswith(".ipynb"):
-         raise ValueError(f"Invalid file type for writing: '{resolved_path}' must point to a .ipynb file.")
-
-    # Ensure parent directory exists
-    parent_dir = os.path.dirname(resolved_path)
-    try:
-        if not os.path.isdir(parent_dir):
-            logger.info(f"Creating parent directory: {parent_dir}")
-            os.makedirs(parent_dir, exist_ok=True)
-    except OSError as e:
-        logger.error(f"Failed to create parent directory '{parent_dir}': {e}")
-        raise IOError(f"Could not create directory for notebook '{resolved_path}': {e}") from e
+    # Ensure the parent directory of the resolved path is within allowed roots if it's a new file
+    # This is implicitly handled by is_path_allowed on the full resolved_path.
 
     try:
+        # Check size before attempting to write
+        notebook_string = nbformat.writes(nb_node, version=nbformat.NO_CONVERT)
+        if len(notebook_string.encode('utf-8')) > max_notebook_size:
+            raise ValueError(f"Notebook content size ({len(notebook_string.encode('utf-8'))} bytes) exceeds maximum allowed size ({max_notebook_size} bytes).")
+
         logger.debug(f"Writing notebook to: {resolved_path}")
-        # Consider adding encoding='utf-8' explicitly
-        nbformat.write(nb, resolved_path)
+        with open(resolved_path, 'w', encoding='utf-8') as f:
+            nbformat.write(nb_node, f)
         logger.debug(f"Successfully wrote notebook: {resolved_path}")
     except Exception as e:
         logger.error(f"Error writing notebook {resolved_path}: {e}", exc_info=True)

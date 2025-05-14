@@ -35,12 +35,12 @@ class CellToolsProvider:
                 raise ValueError(f"Source content exceeds maximum allowed size ({self.config.max_cell_source_size} bytes).")
 
             # Use imported notebook_ops functions
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
             
             nb.cells[cell_index].source = source
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_edit_cell] SUCCESS - Edited cell {cell_index}.", tool_success=True)
             return f"Successfully edited cell {cell_index} in {notebook_path}"
         except (ValueError, FileNotFoundError, IndexError, IOError, PermissionError, nbformat.validator.ValidationError) as e:
@@ -65,7 +65,7 @@ class CellToolsProvider:
             if len(source.encode('utf-8')) > self.config.max_cell_source_size:
                 raise ValueError(f"Source content exceeds maximum allowed size ({self.config.max_cell_source_size} bytes).")
 
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             
             if cell_type == 'code':
                 new_cell = nbformat.v4.new_code_cell(source)
@@ -79,7 +79,7 @@ class CellToolsProvider:
                  raise IndexError(f"Insertion index {insertion_index} (based on insert_after_index {insert_after_index}) is out of bounds (0-{len(nb.cells)}).")
 
             nb.cells.insert(insertion_index, new_cell)
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_add_cell] SUCCESS - Added {cell_type} cell at index {insertion_index}.", tool_success=True)
             return f"Successfully added {cell_type} cell at index {insertion_index} in {notebook_path}"
         except (ValueError, FileNotFoundError, IndexError, IOError, PermissionError, nbformat.validator.ValidationError) as e:
@@ -98,12 +98,12 @@ class CellToolsProvider:
         """
         logger.debug(f"[Tool: notebook_delete_cell] Called. Args: path={notebook_path}, index={cell_index}")
         try:
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
             del nb.cells[cell_index]
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_delete_cell] SUCCESS - Deleted cell {cell_index}.", tool_success=True)
             return f"Successfully deleted cell {cell_index} from {notebook_path}"
         except (ValueError, FileNotFoundError, IndexError, IOError, PermissionError, nbformat.validator.ValidationError) as e:
@@ -117,7 +117,7 @@ class CellToolsProvider:
         """Moves a cell from one position to another."""
         logger.debug(f"[Tool: notebook_move_cell] Called. Args: path={notebook_path}, from={from_index}, to={to_index}")
         try:
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             num_cells = len(nb.cells)
             
             if not 0 <= from_index < num_cells:
@@ -137,7 +137,7 @@ class CellToolsProvider:
             # the list is shorter now, so insert happens at correct perceived position.
             nb.cells.insert(to_index if from_index > to_index else to_index - 1, cell_to_move)
 
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_move_cell] SUCCESS - Moved cell from {from_index} to {to_index}.", tool_success=True)
             return f"Successfully moved cell from index {from_index} to {to_index} in {notebook_path}"
         except (ValueError, FileNotFoundError, IndexError, IOError, PermissionError, nbformat.validator.ValidationError) as e:
@@ -168,7 +168,7 @@ class CellToolsProvider:
         """
         logger.debug(f"[Tool: notebook_split_cell] Called. Args: path={notebook_path}, index={cell_index}, line={split_at_line}")
         try:
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -209,7 +209,7 @@ class CellToolsProvider:
             # Insert new cell
             nb.cells.insert(cell_index + 1, new_cell)
 
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_split_cell] SUCCESS - Split cell {cell_index} at line {split_at_line}.", tool_success=True)
             return f"Successfully split cell {cell_index} at line {split_at_line}."
 
@@ -239,7 +239,7 @@ class CellToolsProvider:
         """
         logger.debug(f"[Tool: notebook_merge_cells] Called. Args: path={notebook_path}, index={first_cell_index}")
         try:
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= first_cell_index < len(nb.cells) - 1:
                 raise IndexError(f"Invalid index {first_cell_index}: Cannot merge last cell or index out of bounds.")
 
@@ -267,7 +267,7 @@ class CellToolsProvider:
 
             del nb.cells[first_cell_index + 1]
 
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_merge_cells] SUCCESS - Merged cell {first_cell_index + 1} into cell {first_cell_index}.", tool_success=True)
             return f"Successfully merged cell {first_cell_index + 1} into cell {first_cell_index}."
 
@@ -298,7 +298,7 @@ class CellToolsProvider:
             raise ValueError(f"Invalid target cell type '{new_type}'. Must be one of {allowed_types}.")
 
         try:
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -326,7 +326,7 @@ class CellToolsProvider:
 
             nb.cells[cell_index] = new_cell
 
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_change_cell_type] SUCCESS - Changed cell {cell_index} from '{original_type}' to '{new_type}'.", tool_success=True)
             return f"Successfully changed cell {cell_index} to type '{new_type}'."
 
@@ -354,7 +354,7 @@ class CellToolsProvider:
             raise ValueError("Duplicate count must be at least 1.")
 
         try:
-            nb = await notebook_ops.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -371,7 +371,7 @@ class CellToolsProvider:
             for i, duplicate_cell in enumerate(duplicates):
                  nb.cells.insert(cell_index + 1 + i, duplicate_cell)
 
-            await notebook_ops.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             plural = "s" if count > 1 else ""
             logger.info(f"[Tool: notebook_duplicate_cell] SUCCESS - Created {count} duplicate{plural} of cell {cell_index}.", tool_success=True)
             return f"Successfully created {count} duplicate{plural} of cell {cell_index}."

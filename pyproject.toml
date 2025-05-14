@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "the-notebook-mcp"
-version = "0.7.0"
+version = "0.8.0"
 authors = [
   { name="Saulo Vallory", email="me@saulo.engineer" },
 ]
@@ -38,7 +38,6 @@ dependencies = [
     "nbconvert>=6.0",
     "ipython",
     "jupyter_core",
-    "ruff>=0.11.9",
     "loguru>=0.7.3",
 ]
 
@@ -52,15 +51,16 @@ test = [
     "pytest-asyncio>=0.18",
     "pytest-cov",
     "coveralls",
+    "pytest-mock"
 ]
 dev = [
-    "the-notebook-mcp[sse,test]"
+    "ruff>=0.11.9",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/jbeno/the-notebook-mcp"
-"Bug Tracker" = "https://github.com/jbeno/the-notebook-mcp/issues"
-"Source" = "https://github.com/jbeno/the-notebook-mcp"
+"Homepage" = "https://github.com/svallory/the-notebook-mcp"
+"Bug Tracker" = "https://github.com/svallory/the-notebook-mcp/issues"
+"Source" = "https://github.com/svallory/the-notebook-mcp"
 
 [project.scripts]
 the-notebook-mcp = "the_notebook_mcp.server:main"
@@ -69,7 +69,7 @@ the-notebook-mcp = "the_notebook_mcp.server:main"
 packages = ["the_notebook_mcp"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=the_notebook_mcp --cov-report=term-missing -m 'not slow'"
+addopts = "--cov=the_notebook_mcp --cov-report=term-missing --cov-report=html -m 'not slow'"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
@@ -79,7 +79,7 @@ source = ["the_notebook_mcp"]
 omit = [
     "*/__main__.py",
     "tests/*",
-    "the_notebook_mcp/__init__.py",
+    "**/__init__.py",
 ]
 
 [tool.coverage.report]
@@ -102,4 +102,14 @@ dev = [
 ]
 
 [tool.poe.tasks]
-start = "python -m the_notebook_mcp.server --allow-root $POE_PWD"
+start = "python -m the_notebook_mcp.server start --allow-root $POE_PWD"
+check-help = "python -m the_notebook_mcp.server help"
+check-help-version = "python -m the_notebook_mcp.server help --version"
+check-version = "python -m the_notebook_mcp.server version"
+check-start = "gtimeout 5s python -m the_notebook_mcp.server start --allow-root $POE_PWD"
+check-start-sse = "gtimeout 5s poe start --transport sse"
+check-start-http = "gtimeout 5s poe start --transport streamable-http"
+
+[tool.poe.tasks.test]
+cmd = "python -m pytest"
+env.JUPYTER_PLATFORM_DIRS = "1"

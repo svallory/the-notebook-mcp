@@ -30,7 +30,7 @@ class OutputToolsProvider:
         """
         logger.debug(f"[Tool: notebook_read_cell_output] Called. Args: path={notebook_path}, index={cell_index}")
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -88,7 +88,7 @@ class OutputToolsProvider:
         logger.debug(f"[Tool: notebook_clear_cell_outputs] Called. Args: path={notebook_path}, index={cell_index}")
         modified = False
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
@@ -110,7 +110,7 @@ class OutputToolsProvider:
                 logger.warning(f"[Tool: notebook_clear_cell_outputs] Cell {cell_index} in {notebook_path} is not a code cell (type: {cell.cell_type}), skipping output clearing.")
                 return f"Skipped: Cell {cell_index} is not a code cell."
 
-            await self.write_notebook(notebook_path, nb, self.config.allowed_roots)
+            await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_clear_cell_outputs] SUCCESS - Cleared outputs for cell {cell_index} in {notebook_path}.", tool_success=True)
             return f"Successfully cleared outputs for cell {cell_index}."
 
@@ -133,7 +133,7 @@ class OutputToolsProvider:
         logger.debug(f"[Tool: notebook_clear_all_outputs] Called. Args: path={notebook_path}")
         cleared_count = 0
         try:
-            nb = await self.read_notebook(notebook_path, self.config.allowed_roots)
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             for i, cell in enumerate(nb.cells):
                 if cell.cell_type == 'code':
                     cell_modified = False
@@ -148,7 +148,7 @@ class OutputToolsProvider:
                         logger.trace(f"[Tool: notebook_clear_all_outputs] Cleared outputs/exec_count for cell {i} in {notebook_path}.")
 
             if cleared_count > 0:
-                await self.write_notebook(notebook_path, nb, self.config.allowed_roots)
+                await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
                 logger.info(f"[Tool: notebook_clear_all_outputs] SUCCESS - Cleared outputs for {cleared_count} code cells in {notebook_path}.", tool_success=True)
                 return f"Successfully cleared outputs for {cleared_count} code cells."
             else:
