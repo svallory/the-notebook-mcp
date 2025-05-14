@@ -4,7 +4,7 @@ import os
 from typing import Optional, List
 import argparse
 
-from .. import __version__  # Import the version from package init
+from .. import __version__
 
 class ServerConfig:
     """
@@ -24,7 +24,6 @@ class ServerConfig:
         command (str): Command for the server.
     """
     
-    # Valid transport options
     VALID_TRANSPORTS = ["stdio", "streamable-http", "sse"]
     
     def __init__(self, args: Optional[argparse.Namespace] = None):
@@ -34,25 +33,25 @@ class ServerConfig:
         Args:
             args: Parsed command-line arguments. If None, only defaults are set and no validation is performed.
         """
-        # Set default values
+        
         self.command = None
-        self.version = __version__  # Use version from package
+        self.version = __version__
         self.allow_root_dirs = []
         self.max_cell_source_size = 10 * 1024 * 1024  # 10 MiB
         self.max_cell_output_size = 10 * 1024 * 1024  # 10 MiB
         self.log_dir = os.path.expanduser("~/.the-notebook-mcp")
         self.log_level = "INFO"
-        self.transport = "stdio"  # Default transport
-        self.host = "0.0.0.0"   # Changed default to localhost
+        self.transport = "stdio"
+        self.host = "0.0.0.0"
         self.port = 8889
-        self.path = "/mcp"        # Default path for HTTP transports
+        self.path = "/mcp"
         
-        # Apply parsed arguments if provided
+        
         if args:
-            if hasattr(args, 'command'): # Store the command first
+            if hasattr(args, 'command'):
                 self.command = args.command
             self._apply_args(args)
-            self._validate() # Validate only if args are provided
+            self._validate()
         
     def _apply_args(self, args: argparse.Namespace):
         """
@@ -61,10 +60,10 @@ class ServerConfig:
         Args:
             args: Parsed command-line arguments.
         """
-        # Copy values from args
+        
         if hasattr(args, 'allow_root_dirs'):
             self.allow_root_dirs = args.allow_root_dirs
-        elif hasattr(args, 'allow_root'): # Fallback for singular form if present
+        elif hasattr(args, 'allow_root'):
             self.allow_root_dirs = args.allow_root
         
         if hasattr(args, 'max_cell_source_size'):
@@ -98,7 +97,7 @@ class ServerConfig:
         Raises:
             ValueError: If any configuration values are invalid.
         """
-        # Check that allow_root_dirs is populated only for the 'start' command
+        
         if self.command == "start" and not self.allow_root_dirs:
             raise ValueError("At least one --allow-root must be specified for the 'start' command")
         
@@ -112,25 +111,25 @@ class ServerConfig:
                 if not os.path.isdir(dir_path):
                     raise ValueError(f"--allow-root directory does not exist: {dir_path}")
         
-        # Check that max_cell_source_size is positive
+        
         if self.max_cell_source_size <= 0:
             raise ValueError(f"--max-cell-source-size must be positive: {self.max_cell_source_size}")
         
-        # Check that max_cell_output_size is positive
+        
         if self.max_cell_output_size <= 0:
             raise ValueError(f"--max-cell-output-size must be positive: {self.max_cell_output_size}")
             
-        # Validate transport
+        
         if self.transport not in self.VALID_TRANSPORTS:
             raise ValueError(f"Invalid transport: {self.transport}. Must be one of {', '.join(self.VALID_TRANSPORTS)}")
             
-        # Validate HTTP-specific options
+        
         if self.transport in ["streamable-http", "sse"]:
-            # Port must be between 1 and 65535
+            
             if not 1 <= self.port <= 65535:
                 raise ValueError(f"Port must be between 1 and 65535, got {self.port}")
                 
-            # Path must start with /
+            
             if not self.path.startswith('/'):
                 raise ValueError(f"Path must start with /, got '{self.path}'")
                 
@@ -141,14 +140,14 @@ class ServerConfig:
         Returns:
             A dictionary of kwargs to pass to FastMCP.run().
         """
-        # Base kwargs for all transports
+        
         kwargs = {}
         
         if self.transport == "stdio":
-            # STDIO transport only requires the transport name
+            
             kwargs["transport"] = "stdio"
         elif self.transport == "streamable-http":
-            # For HTTP-based transports, include all HTTP-specific parameters
+            
             kwargs.update({
                 "transport": "streamable-http",
                 "host": self.host,
@@ -157,7 +156,7 @@ class ServerConfig:
                 "log_level": self.log_level.lower()
             })
         elif self.transport == "sse":
-            # SSE is deprecated but still supported
+            
             kwargs.update({
                 "transport": "sse",
                 "host": self.host,

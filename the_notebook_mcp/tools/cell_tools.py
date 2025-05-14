@@ -2,24 +2,20 @@
 Tools for cell manipulation (add, edit, delete, move, split, merge, type change, duplicate).
 """
 
-import copy # Needed for duplicate_cell
-from loguru import logger # Import Loguru
+import copy
+from typing import List
+from loguru import logger
 
 import nbformat
 
-# Import necessary components
 from ..core.config import ServerConfig
-from ..core import notebook_ops # Import the module directly
+from ..core import notebook_ops
 
 class CellToolsProvider:
-    # Update __init__ signature and body
     def __init__(self, config: ServerConfig):
         self.config = config
-        # Core ops functions are used directly via notebook_ops.<func_name>
-        # mcp_instance is not needed here, registration happens in mcp_setup
         logger.debug("CellToolsProvider initialized.")
 
-    # Update method calls to use imported functions
     async def notebook_edit_cell(self, notebook_path: str, cell_index: int, source: str) -> str:
         """Replaces the source content of a specific cell in a Jupyter Notebook.
 
@@ -34,7 +30,6 @@ class CellToolsProvider:
             if len(source.encode('utf-8')) > self.config.max_cell_source_size:
                 raise ValueError(f"Source content exceeds maximum allowed size ({self.config.max_cell_source_size} bytes).")
 
-            # Use imported notebook_ops functions
             nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
@@ -114,7 +109,17 @@ class CellToolsProvider:
             raise RuntimeError(f"An unexpected error occurred: {e}") from e
 
     async def notebook_move_cell(self, notebook_path: str, from_index: int, to_index: int) -> str:
-        """Moves a cell from one position to another."""
+        """Moves a cell from one position to another.
+        
+        Args:
+            notebook_path: Absolute path to the .ipynb file within an allowed root.
+            from_index: The 0-based index of the cell to move.
+            to_index: The 0-based target index where the cell should be moved to.
+                      Note: This is the index after the move operation is complete.
+                      
+        Returns:
+            A success message string.
+        """
         logger.debug(f"[Tool: notebook_move_cell] Called. Args: path={notebook_path}, from={from_index}, to={to_index}")
         try:
             nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
@@ -126,16 +131,19 @@ class CellToolsProvider:
             if not 0 <= to_index <= num_cells: 
                 raise IndexError(f"Destination index {to_index} is out of bounds (0-{num_cells}).")
                 
-            # No change if indices are the same or adjacent in a way that results in no move
-            if from_index == to_index or from_index + 1 == to_index:
+            # No change if indices are the same
+            if from_index == to_index:
                  logger.debug("[Tool: notebook_move_cell] SKIPPED - Cell move results in no change.")
-                 return f"Cell at index {from_index} was not moved (source and destination are effectively the same)."
+                 return f"Cell at index {from_index} was not moved (source and destination are the same)."
 
+            # Remove the cell from its current position
             cell_to_move = nb.cells.pop(from_index)
             
-            # Insert at the target index. If destination was after source, 
-            # the list is shorter now, so insert happens at correct perceived position.
-            nb.cells.insert(to_index if from_index > to_index else to_index - 1, cell_to_move)
+            # Insert at the target index 
+            # If we're moving to the end of the notebook, we need to handle that case
+            # If from_index < to_index, we need to account for the removal of the cell
+            insert_at = to_index if from_index >= to_index else to_index - 1
+            nb.cells.insert(insert_at, cell_to_move)
 
             await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_move_cell] SUCCESS - Moved cell from {from_index} to {to_index}.", tool_success=True)
@@ -146,12 +154,6 @@ class CellToolsProvider:
         except Exception as e:
             logger.exception(f"[Tool: notebook_move_cell] FAILED - Unexpected error: {e}")
             raise RuntimeError(f"An unexpected error occurred: {e}") from e
-
-    # --- Other methods (split, merge, change_type, duplicate) need similar updates --- 
-    # Replace self.read_notebook -> notebook_ops.read_notebook
-    # Replace self.write_notebook -> notebook_ops.write_notebook
-    # Replace self.create_log_prefix -> log_prefix
-    # Make sure nbformat.validator.ValidationError is caught in relevant handlers
 
     async def notebook_split_cell(self, notebook_path: str, cell_index: int, split_at_line: int) -> str:
         """Splits a cell into two at a specified line number.
@@ -168,37 +170,47 @@ class CellToolsProvider:
         """
         logger.debug(f"[Tool: notebook_split_cell] Called. Args: path={notebook_path}, index={cell_index}, line={split_at_line}")
         try:
+            # Load the notebook using notebook_ops
             nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
 
+            # Get the cell to split and its content
             cell_to_split = nb.cells[cell_index]
             source = cell_to_split.get('source', '')
-            lines = source.splitlines(True) # Keep line endings
+            
+            # Split source into lines while preserving line endings
+            lines = source.splitlines(True)
 
-            # Convert 1-based line number to 0-based index for slicing
+            # Convert 1-based line number (user-friendly) to 0-based index (for Python slicing)
             split_index = split_at_line - 1
 
+            # Validate split position is within bounds
             if not 0 < split_index < len(lines):
                  raise ValueError(f"Split line number {split_at_line} is out of bounds for cell with {len(lines)} lines.")
 
-            source_part1 = "".join(lines[:split_index])
-            source_part2 = "".join(lines[split_index:])
+            # Create two separate content parts by slicing the lines list
+            source_part1 = "".join(lines[:split_index])    # First part: lines before split point
+            source_part2 = "".join(lines[split_index:])    # Second part: split point line and all lines after
 
-            # --- Validate source sizes for the new cells --- 
+            # Validate the size of both parts to ensure they don't exceed allowed limits
             max_size = self.config.max_cell_source_size
             if len(source_part1.encode('utf-8')) > max_size or \
                len(source_part2.encode('utf-8')) > max_size:
                 raise ValueError(f"Resulting source content after split exceeds maximum allowed size ({max_size} bytes) for one or both cells.")
 
-            # Modify original cell
+            # Update the original cell with just the first part
             cell_to_split.source = source_part1
+            
+            # If it's a code cell, clear outputs and execution count since content changed
             if cell_to_split.cell_type == 'code':
                 cell_to_split.outputs = []
                 cell_to_split.execution_count = None
 
-            # Create new cell
+            # Create a new cell for the second part with the same metadata and type as original
             new_cell_metadata = copy.deepcopy(cell_to_split.metadata)
+            
+            # Create the appropriate type of new cell based on the original cell's type
             if cell_to_split.cell_type == 'code':
                 new_cell = nbformat.v4.new_code_cell(source=source_part2, metadata=new_cell_metadata)
             elif cell_to_split.cell_type == 'markdown':
@@ -206,9 +218,10 @@ class CellToolsProvider:
             else: # Raw cell
                 new_cell = nbformat.v4.new_raw_cell(source=source_part2, metadata=new_cell_metadata)
 
-            # Insert new cell
+            # Insert the new cell immediately after the original cell
             nb.cells.insert(cell_index + 1, new_cell)
 
+            # Save the modified notebook back to disk
             await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
             logger.info(f"[Tool: notebook_split_cell] SUCCESS - Split cell {cell_index} at line {split_at_line}.", tool_success=True)
             return f"Successfully split cell {cell_index} at line {split_at_line}."

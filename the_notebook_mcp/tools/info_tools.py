@@ -2,22 +2,22 @@ import os
 from typing import List, Dict, Union
 
 import nbformat
-from loguru import logger # Import Loguru
+from loguru import logger
 
 from ..core import notebook_ops
-from ..core.config import ServerConfig # Assuming ServerConfig is needed
-from .tool_utils import extract_code_outline, extract_markdown_outline, get_first_line_context # Keep necessary utils
+from ..core.config import ServerConfig
+from .tool_utils import extract_code_outline, extract_markdown_outline, get_first_line_context
 
 
 class InfoToolsProvider:
     """Provides MCP tools for reading notebook information and content."""
 
-    def __init__(self, config: ServerConfig): # Use ServerConfig type hint
+    def __init__(self, config: ServerConfig):
         self.config = config
         # Directly use imported notebook_ops functions
         self.read_notebook = notebook_ops.read_notebook
         self.is_path_allowed = notebook_ops.is_path_allowed
-        logger.debug("InfoToolsProvider initialized.") # Changed to DEBUG
+        logger.debug("InfoToolsProvider initialized.")
 
     async def notebook_read(self, notebook_path: str) -> dict:
         """Reads the entire content of a Jupyter Notebook file.
@@ -28,7 +28,7 @@ class InfoToolsProvider:
         Returns:
             A dictionary representing the notebook content (nbformat structure).
         """
-        logger.debug(f"[Tool: notebook_read] Called. Args: path={notebook_path}") # Changed to DEBUG
+        logger.debug(f"[Tool: notebook_read] Called. Args: path={notebook_path}")
         try:
             # Security check happens within read_notebook
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
@@ -37,15 +37,15 @@ class InfoToolsProvider:
             # Example: Check total notebook size if needed, though read_notebook might handle internal limits.
             # Consider if nbformat.writes(nb) size check is necessary based on config
 
-            logger.info(f"[Tool: notebook_read] SUCCESS - Read notebook content for {notebook_path}.", tool_success=True) # Changed to INFO, added extra context
+            logger.info(f"[Tool: notebook_read] SUCCESS - Read notebook content for {notebook_path}.", tool_success=True)
             # Return the notebook object directly (nbformat handles JSON compatibility)
-            return nb # nbformat.to_dict(nb) if pure dict is always required
+            return nb
 
         except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError) as e:
-            logger.error(f"[Tool: notebook_read] FAILED - {e}") # Changed to ERROR
+            logger.error(f"[Tool: notebook_read] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_read] FAILED - Unexpected error: {e}") # Changed to EXCEPTION
+            logger.exception(f"[Tool: notebook_read] FAILED - Unexpected error: {e}")
             raise RuntimeError(f"An unexpected error occurred while reading the notebook: {e}") from e
 
     async def notebook_read_cell(self, notebook_path: str, cell_index: int) -> str:
@@ -58,7 +58,7 @@ class InfoToolsProvider:
         Returns:
             The source content (string) of the specified cell.
         """
-        logger.debug(f"[Tool: notebook_read_cell] Called. Args: path={notebook_path}, index={cell_index}") # Changed to DEBUG
+        logger.debug(f"[Tool: notebook_read_cell] Called. Args: path={notebook_path}, index={cell_index}")
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
@@ -71,14 +71,14 @@ class InfoToolsProvider:
             # if len(source.encode('utf-8')) > self.config.max_cell_source_size:
             #     logger.warning(f"[Tool: notebook_read_cell] Cell source size exceeds limit, but returning content.")
 
-            logger.info(f"[Tool: notebook_read_cell] SUCCESS - Read cell {cell_index} source from {notebook_path}.", tool_success=True) # Changed to INFO, added extra context
+            logger.info(f"[Tool: notebook_read_cell] SUCCESS - Read cell {cell_index} source from {notebook_path}.", tool_success=True)
             return source
 
         except (PermissionError, FileNotFoundError, IndexError, ValueError, nbformat.validator.ValidationError, IOError) as e:
-            logger.error(f"[Tool: notebook_read_cell] FAILED - {e}") # Changed to ERROR
+            logger.error(f"[Tool: notebook_read_cell] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_read_cell] FAILED - Unexpected error: {e}") # Changed to EXCEPTION
+            logger.exception(f"[Tool: notebook_read_cell] FAILED - Unexpected error: {e}")
             raise RuntimeError(f"An unexpected error occurred while reading cell {cell_index}: {e}") from e
 
     async def notebook_get_cell_count(self, notebook_path: str) -> int:
@@ -90,17 +90,17 @@ class InfoToolsProvider:
         Returns:
             The integer count of cells in the notebook.
         """
-        logger.debug(f"[Tool: notebook_get_cell_count] Called. Args: path={notebook_path}") # Changed to DEBUG
+        logger.debug(f"[Tool: notebook_get_cell_count] Called. Args: path={notebook_path}")
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             count = len(nb.cells)
-            logger.info(f"[Tool: notebook_get_cell_count] SUCCESS - Notebook {notebook_path} has {count} cells.", tool_success=True) # Changed to INFO, added extra context
+            logger.info(f"[Tool: notebook_get_cell_count] SUCCESS - Notebook {notebook_path} has {count} cells.", tool_success=True)
             return count
         except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError) as e:
-            logger.error(f"[Tool: notebook_get_cell_count] FAILED - {e}") # Changed to ERROR
+            logger.error(f"[Tool: notebook_get_cell_count] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_get_cell_count] FAILED - Unexpected error: {e}") # Changed to EXCEPTION
+            logger.exception(f"[Tool: notebook_get_cell_count] FAILED - Unexpected error: {e}")
             raise RuntimeError(f"An unexpected error occurred while getting cell count: {e}") from e
 
     async def notebook_get_info(self, notebook_path: str) -> dict:
@@ -113,7 +113,7 @@ class InfoToolsProvider:
             A dictionary containing basic file info (path, size, modified time)
             and notebook info (cell count, format version).
         """
-        logger.debug(f"[Tool: notebook_get_info] Called. Args: path={notebook_path}") # Changed to DEBUG
+        logger.debug(f"[Tool: notebook_get_info] Called. Args: path={notebook_path}")
         try:
             # Basic path validation first
             if not os.path.isabs(notebook_path):
@@ -137,7 +137,7 @@ class InfoToolsProvider:
             }
 
             # Read notebook for cell count and format info
-            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs) # Use original path
+            nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             notebook_info = {
                 "cell_count": len(nb.cells),
                 "nbformat": nb.nbformat,
@@ -146,14 +146,14 @@ class InfoToolsProvider:
             }
 
             info = {**file_info, **notebook_info}
-            logger.info(f"[Tool: notebook_get_info] SUCCESS - Gathered notebook info for {notebook_path}.", tool_success=True) # Changed to INFO, added extra context
+            logger.info(f"[Tool: notebook_get_info] SUCCESS - Gathered notebook info for {notebook_path}.", tool_success=True)
             return info
 
         except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError, OSError) as e:
-            logger.error(f"[Tool: notebook_get_info] FAILED - {e}") # Changed to ERROR
+            logger.error(f"[Tool: notebook_get_info] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_get_info] FAILED - Unexpected error: {e}") # Changed to EXCEPTION
+            logger.exception(f"[Tool: notebook_get_info] FAILED - Unexpected error: {e}")
             raise RuntimeError(f"An unexpected error occurred while getting notebook info: {e}") from e
 
 
@@ -169,7 +169,7 @@ class InfoToolsProvider:
             For code cells, 'text' might be a function/class name or first line context,
             and 'definitions' might contain a list of extracted names.
         """
-        logger.debug(f"[Tool: notebook_get_outline] Called. Args: path={notebook_path}") # Changed to DEBUG
+        logger.debug(f"[Tool: notebook_get_outline] Called. Args: path={notebook_path}")
         outline = []
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
@@ -188,7 +188,7 @@ class InfoToolsProvider:
                         })
                 elif cell_type == 'code':
                     code_defs = extract_code_outline(source)
-                    first_lines = get_first_line_context(source) # Get first few non-empty lines
+                    first_lines = get_first_line_context(source)
 
                     # Decide what to represent the code cell as in the outline
                     # Option 1: Primary entry for the cell with definitions listed
@@ -208,14 +208,14 @@ class InfoToolsProvider:
                         })
 
 
-            logger.info(f"[Tool: notebook_get_outline] SUCCESS - Generated outline with {len(outline)} items for {notebook_path}.", tool_success=True) # Changed to INFO, added extra context
+            logger.info(f"[Tool: notebook_get_outline] SUCCESS - Generated outline with {len(outline)} items for {notebook_path}.", tool_success=True)
             return outline
 
         except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError) as e:
-            logger.error(f"[Tool: notebook_get_outline] FAILED - {e}") # Changed to ERROR
+            logger.error(f"[Tool: notebook_get_outline] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_get_outline] FAILED - Unexpected error generating outline: {e}") # Changed to EXCEPTION
+            logger.exception(f"[Tool: notebook_get_outline] FAILED - Unexpected error generating outline: {e}")
             raise RuntimeError(f"An unexpected error occurred while generating the notebook outline: {e}") from e
 
 
@@ -236,7 +236,7 @@ class InfoToolsProvider:
             A list of dictionaries, each representing a match, containing:
             {'cell_index': int, 'cell_type': str, 'line_number': int, 'line_content': str}.
         """
-        logger.debug(f"[Tool: notebook_search] Called. Args: path={notebook_path}, query_len={len(query)}, case_sensitive={case_sensitive}") # Changed to DEBUG
+        logger.debug(f"[Tool: notebook_search] Called. Args: path={notebook_path}, query_len={len(query)}, case_sensitive={case_sensitive}")
         matches = []
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
@@ -260,15 +260,12 @@ class InfoToolsProvider:
                         # if len(matches) >= MAX_SEARCH_RESULTS: break
                 # if len(matches) >= MAX_SEARCH_RESULTS: break
 
-            logger.info(f"[Tool: notebook_search] SUCCESS - Found {len(matches)} matches in {notebook_path}.", tool_success=True) # Changed to INFO, added extra context
+            logger.info(f"[Tool: notebook_search] SUCCESS - Found {len(matches)} matches in {notebook_path}.", tool_success=True)
             return matches
 
         except (PermissionError, FileNotFoundError, ValueError, nbformat.validator.ValidationError, IOError) as e:
-            logger.error(f"[Tool: notebook_search] FAILED - {e}") # Changed to ERROR
+            logger.error(f"[Tool: notebook_search] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(f"[Tool: notebook_search] FAILED - Unexpected error during search: {e}") # Changed to EXCEPTION
-            raise RuntimeError(f"An unexpected error occurred while searching the notebook: {e}") from e
-
-# Remove original placeholder comments
-# ... existing code ... 
+            logger.exception(f"[Tool: notebook_search] FAILED - Unexpected error during search: {e}")
+            raise RuntimeError(f"An unexpected error occurred while searching the notebook: {e}") from e 

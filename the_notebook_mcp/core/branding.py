@@ -18,9 +18,9 @@ def get_ascii_banner() -> dict:
     Generates a colored ASCII art banner for "The Notebook MCP".
     Uses Loguru color tags and Python logo colors.
     """
-    # Simpler, hollow-style banner using Python colors
+    
     blue = "fg #3776AB"
-    # yellow: <fg #FFD43B>
+    
     orange = "fg #e46e2e"
     banner_lines = [
         "",
@@ -30,7 +30,7 @@ def get_ascii_banner() -> dict:
         f"<{blue}> ┻ ┛┗┗   </{blue}><{orange}>▐▌  ▐▌▝▚▄▞▘  █  ▐▙▄▄▖▐▙▄▞▘▝▚▄▞▘▝▚▄▞▘▐▌ ▐▌</{orange}><{blue}>  ┛ ┗┗┛┣┛</{blue}>",
     ]
     
-    # Use actual newline characters, not escaped ones
+    
     return {
         "width": 59,
         "text": "\n".join(banner_lines)
@@ -52,7 +52,7 @@ def get_server_startup_message(
         Formatted startup message string
     """
     
-    # Get the banner
+    
     banner = get_ascii_banner()
     
     # Center version string after the banner
@@ -90,5 +90,5 @@ def get_server_startup_message(
 ╰{ "─" * box_width }╯
 """
 
-    # Combine the ASCII art, centered version and connection box
+    
     return f"{banner['text']}\n<magenta>{centered_version}</magenta>\n{connection_box}\n"

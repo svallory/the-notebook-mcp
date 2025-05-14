@@ -1,6 +1,6 @@
 import argparse
 import os
-import sys # Import sys for exit and stderr
+import sys
 
 from .core.config import ServerConfig
 
@@ -13,6 +13,19 @@ def case_insensitive_log_level(value: str) -> str:
     return value.upper()
 
 def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments for the Jupyter Notebook MCP Server.
+    
+    This function sets up the argument parser with subcommands (start, version, help),
+    defines all available arguments, and handles special cases like the help command.
+    
+    For the 'start' command, it defines arguments for allowed root directories,
+    logging configuration, cell size limits, and network transport settings.
+    
+    Returns:
+        An argparse.Namespace object containing the parsed command-line arguments.
+        If no command is provided or help is requested, the function may exit the process
+        after printing appropriate help text.
+    """
     parser = argparse.ArgumentParser(
         description="Jupyter Notebook MCP Server.",
         # Allow showing help on error for the main parser
@@ -156,12 +169,12 @@ def parse_arguments() -> argparse.Namespace:
                 subparser_choices_map[parsed_args.cmd_to_help].print_help()
             else:
                 print(f"Error: Unknown command '{parsed_args.cmd_to_help}' for help.\\n", file=sys.stderr)
-                parser.print_help(sys.stderr) # Print main help to stderr
-                sys.exit(1) # Exit with error status
-            sys.exit(0) # Exit successfully after printing specific help
+                parser.print_help(sys.stderr)
+                sys.exit(1)
+            sys.exit(0)
         else:
             # 'the-notebook-mcp help' (no specific command, no --version flag)
             parser.print_help()
-            sys.exit(0) # Exit successfully after printing main help
+            sys.exit(0)
             
     return parsed_args 

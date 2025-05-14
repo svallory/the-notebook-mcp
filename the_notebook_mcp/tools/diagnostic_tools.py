@@ -35,7 +35,7 @@ class DiagnosticToolsProvider:
                 spec = importlib.util.find_spec(lib_name)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module) # type: ignore
+                    spec.loader.exec_module(module)
                     version = getattr(module, '__version__', 'N/A')
                     path = getattr(spec, 'origin', 'N/A')
                     results.append(f"  [PASS] {lib_name} (v{version}): {description}")

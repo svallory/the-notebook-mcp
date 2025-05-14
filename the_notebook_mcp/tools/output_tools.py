@@ -1,8 +1,11 @@
-from typing import List
+"""
+Tools for reading cell outputs.
+"""
 
+from typing import List
+from loguru import logger
 import nbformat
 from nbformat import NotebookNode
-from loguru import logger
 
 from ..core import notebook_ops
 from ..core.config import ServerConfig
@@ -17,7 +20,7 @@ class OutputToolsProvider:
         logger.debug("OutputToolsProvider initialized.")
 
     async def notebook_read_cell_output(self, notebook_path: str, cell_index: int) -> List[dict]:
-        """Reads the output(s) of a specific code cell.
+        """Reads the output of a specific code cell.
 
         Args:
             notebook_path: Absolute path to the .ipynb file within an allowed root.
@@ -33,45 +36,55 @@ class OutputToolsProvider:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
                 raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells)-1}).")
-
+            
             cell = nb.cells[cell_index]
             if cell.cell_type != 'code':
-                logger.warning(f"[Tool: notebook_read_cell_output] Cell {cell_index} in {notebook_path} is not a code cell (type: {cell.cell_type}), returning empty output list.")
-                return []
+                raise ValueError(f"Cell {cell_index} is not a code cell (type: {cell.cell_type}). Outputs are only applicable to code cells.")
 
-            outputs = cell.get('outputs', [])
-
-            # --- Output Size Check (Optional but recommended) ---
-            total_output_size = 0
-            for output_item in outputs:
-                try:
-                    # Attempt to serialize each output to estimate size
-                    # This is approximate; actual disk usage might differ slightly
-                    output_json = nbformat.writes(NotebookNode(output_item), version=nbformat.NO_CONVERT)
-                    output_size = len(output_json.encode('utf-8'))
-                    total_output_size += output_size
-                except Exception as e:
-                    logger.warning(f"[Tool: notebook_read_cell_output] Could not serialize output item for size check: {e}")
-                    # Decide how to handle: skip? include raw? fail?
-                    # Including raw for now, size check might be inaccurate.
-
-
-            if total_output_size > self.config.max_cell_output_size:
-                # Option 1: Raise error
-                # raise ValueError(f"Total output size ({total_output_size} bytes) exceeds limit ({self.config.max_cell_output_size} bytes).")
-                # Option 2: Log warning and return truncated/empty (returning full for now)
-                 logger.warning(f"[Tool: notebook_read_cell_output] Total output size ({total_output_size} bytes) for cell {cell_index} in {notebook_path} exceeds limit ({self.config.max_cell_output_size} bytes), returning full output anyway.")
-
-            logger.info(f"[Tool: notebook_read_cell_output] SUCCESS - Read {len(outputs)} output items from cell {cell_index} in {notebook_path}.", tool_success=True)
-            # Return copies as plain dicts
-            return [dict(o) for o in outputs]
-
-        except (PermissionError, FileNotFoundError, IndexError, ValueError, nbformat.validator.ValidationError, IOError) as e:
+            processed_outputs = []
+            for output in cell.outputs:
+                
+                
+                output_dict = dict(output) 
+                
+                
+                if "data" in output_dict and isinstance(output_dict["data"], dict):
+                    for mime_type, data_content in output_dict["data"].items():
+                        if isinstance(data_content, str):
+                            
+                            if len(data_content.encode('utf-8')) > self.config.max_cell_output_size:
+                                
+                                if mime_type.startswith("image/"):
+                                    output_dict["data"][mime_type] = f"<image data too large: {len(data_content.encode('utf-8'))} bytes>"
+                                else:
+                                    output_dict["data"][mime_type] = f"<data too large: {len(data_content.encode('utf-8'))} bytes, first 256 chars: {data_content[:256]}...>"
+                                logger.warning(f"[Tool: notebook_read_cell_output] Truncated large data for mime_type '{mime_type}' in cell {cell_index}.")
+                        elif isinstance(data_content, list): 
+                            
+                            data_as_str = "".join(data_content)
+                            if len(data_as_str.encode('utf-8')) > self.config.max_cell_output_size:
+                                output_dict["data"][mime_type] = [f"<stream data too large: {len(data_as_str.encode('utf-8'))} bytes, first 256 chars: {data_as_str[:256]}...>" ]
+                                logger.warning(f"[Tool: notebook_read_cell_output] Truncated large stream data for mime_type '{mime_type}' in cell {cell_index}.")
+                
+                elif "text" in output_dict and isinstance(output_dict["text"], (str, list)):
+                    text_content = output_dict["text"]
+                    if isinstance(text_content, list):
+                        text_content = "".join(text_content)
+                    
+                    if len(text_content.encode('utf-8')) > self.config.max_cell_output_size:
+                        output_dict["text"] = f"<text data too large: {len(text_content.encode('utf-8'))} bytes, first 256 chars: {text_content[:256]}...>"
+                        logger.warning(f"[Tool: notebook_read_cell_output] Truncated large text output in cell {cell_index}.")
+                
+                processed_outputs.append(output_dict)
+            
+            logger.info(f"[Tool: notebook_read_cell_output] SUCCESS - Read {len(processed_outputs)} outputs for cell {cell_index}.", tool_success=True)
+            return processed_outputs
+        except (PermissionError, FileNotFoundError, IndexError, ValueError, IOError) as e:
             logger.error(f"[Tool: notebook_read_cell_output] FAILED - {e}")
             raise
         except Exception as e:
             logger.exception(f"[Tool: notebook_read_cell_output] FAILED - Unexpected error: {e}")
-            raise RuntimeError(f"An unexpected error occurred while reading cell output: {e}") from e
+            raise RuntimeError(f"An unexpected error occurred while reading cell outputs for cell {cell_index}: {e}") from e
 
 
     async def notebook_clear_cell_outputs(self, notebook_path: str, cell_index: int) -> str:

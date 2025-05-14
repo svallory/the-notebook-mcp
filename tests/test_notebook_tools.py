@@ -58,7 +58,7 @@ def fixture_notebook_path():
     return os.path.abspath("tests/fixtures/test_notebook.ipynb")
 
 @pytest.fixture
-def temp_notebook(fixture_notebook_path, request): # request to get unique name per test
+def temp_notebook(fixture_notebook_path, request):
     """Copies the fixture notebook to a temporary location for modification tests, within the workspace."""
     test_name = request.node.name
     # Create a unique filename for each test to avoid conflicts if run in parallel (though not set up for that yet)
@@ -93,7 +93,7 @@ def metadata_tools(server_config):
 def output_tools(server_config):
     return OutputToolsProvider(server_config)
 
-# --- Helper to read notebook directly for assertions ---
+# Helper to read notebook directly for assertions
 def read_nb_content(path):
     with open(path, 'r', encoding='utf-8') as f:
         return nbformat.read(f, as_version=4)
@@ -201,7 +201,6 @@ async def test_notebook_delete_cell(cell_tools, temp_notebook):
     nb = read_nb_content(temp_notebook)
     assert len(nb.cells) == initial_cell_count - 1
     # Check that the deleted cell is gone and other cells shifted if necessary
-    # For simplicity, just check that the content of the cell at that index is now different (or the cell at index-1 if last was deleted)
     if target_cell_index_to_delete < len(nb.cells):
         assert nb.cells[target_cell_index_to_delete].source != original_cell_content
     else: # if last cell was deleted
@@ -393,7 +392,6 @@ async def test_notebook_clear_all_outputs(output_tools, temp_notebook):
 
 
 # --- FileToolsProvider Tests ---
-# These tests create and delete files, so they need careful management.
 
 @pytest.mark.asyncio
 async def test_notebook_create_and_delete(file_tools):
@@ -412,10 +410,9 @@ async def test_notebook_create_and_delete(file_tools):
 @pytest.mark.asyncio
 async def test_notebook_create_errors(file_tools, temp_notebook):
     # temp_notebook provides a valid, existing notebook path from fixture
-    existing_nb_path = temp_notebook # This is already resolved in the fixture
-    non_abs_path = "relative_path.ipynb" # This should remain relative for its specific test
-    # For paths that need to be absolute to test other conditions, resolve them:
-    outside_root_path = str(Path("/tmp/outside_root.ipynb").resolve()) # Resolve to make it absolute
+    existing_nb_path = temp_notebook
+    non_abs_path = "relative_path.ipynb"
+    outside_root_path = str(Path("/tmp/outside_root.ipynb").resolve())
     invalid_ext_path = str((TEMP_FIXTURE_COPIES_DIR / "invalid_ext.txt").resolve())
     
     # 1. Non-absolute path
@@ -423,8 +420,6 @@ async def test_notebook_create_errors(file_tools, temp_notebook):
         await file_tools.notebook_create(non_abs_path)
 
     # 2. Path outside allowed root
-    # We need to ensure server_config.allow_root_dirs doesn't accidentally include /tmp
-    # For this test, we'll rely on the fixture's setup of allow_root_dirs
     with pytest.raises(PermissionError, match="Access denied: Path is outside the allowed workspace roots"):
         await file_tools.notebook_create(outside_root_path)
 
@@ -438,8 +433,7 @@ async def test_notebook_create_errors(file_tools, temp_notebook):
 
 @pytest.mark.asyncio
 async def test_notebook_delete_errors(file_tools):
-    non_abs_path = "relative_path.ipynb" # This should remain relative
-    # For paths that need to be absolute to test other conditions, resolve them:
+    non_abs_path = "relative_path.ipynb"
     outside_root_path = str(Path("/tmp/outside_root_delete.ipynb").resolve())
     invalid_ext_path = str((TEMP_FIXTURE_COPIES_DIR / "delete_invalid_ext.txt").resolve())
     non_existent_path = str((TEMP_FIXTURE_COPIES_DIR / "non_existent_to_delete.ipynb").resolve())
@@ -462,11 +456,11 @@ async def test_notebook_delete_errors(file_tools):
 
 @pytest.mark.asyncio
 async def test_notebook_rename_errors(file_tools, temp_notebook):
-    original_path = temp_notebook # Valid, existing, absolute path
+    original_path = temp_notebook
     non_abs_old_path = "relative_old.ipynb"
     non_abs_new_path = "relative_new.ipynb"
     abs_new_base = TEMP_FIXTURE_COPIES_DIR / "renamed_test"
-    os.makedirs(abs_new_base, exist_ok=True) # Ensure the base directory for new paths exists
+    os.makedirs(abs_new_base, exist_ok=True)
 
     # 1. Old path is not absolute
     with pytest.raises(ValueError, match="Only absolute paths are allowed"):
@@ -515,18 +509,17 @@ async def test_notebook_rename_errors(file_tools, temp_notebook):
 
 @pytest.mark.asyncio
 async def test_notebook_rename(file_tools, temp_notebook):
-    # Use TEMP_FIXTURE_COPIES_DIR for the renamed path as well
     renamed_nb_path_str = str((TEMP_FIXTURE_COPIES_DIR / "renamed_notebook_test.ipynb").resolve())
 
-    initial_content = read_nb_content(temp_notebook) # Read before move
+    initial_content = read_nb_content(temp_notebook)
 
     await file_tools.notebook_rename(temp_notebook, renamed_nb_path_str)
     
-    assert not Path(temp_notebook).exists() # Original should be gone
+    assert not Path(temp_notebook).exists()
     assert Path(renamed_nb_path_str).exists()
     
     renamed_nb_content = read_nb_content(renamed_nb_path_str)
-    assert len(renamed_nb_content.cells) == len(initial_content.cells) # Content should be the same
+    assert len(renamed_nb_content.cells) == len(initial_content.cells)
     # Clean up
     await file_tools.notebook_delete(renamed_nb_path_str)
 
@@ -551,7 +544,7 @@ async def test_notebook_validate(file_tools, fixture_notebook_path):
     
     result_invalid = await file_tools.notebook_validate(invalid_nb_path_str)
     assert "Notebook validation failed" in result_invalid
-    assert "'nbformat_minor' is a required property" in result_invalid # Specific error message
+    assert "'nbformat_minor' is a required property" in result_invalid
 
     if os.path.exists(invalid_nb_path_str): 
         os.remove(invalid_nb_path_str)
@@ -567,7 +560,6 @@ async def test_notebook_export(file_tools, fixture_notebook_path):
     export_formats = ["html", "python", "markdown"] 
 
     for fmt in export_formats:
-        # Use TEMP_FIXTURE_COPIES_DIR for output
         output_file_name = f"exported_notebook_test.{fmt}"
         output_file = TEMP_FIXTURE_COPIES_DIR / output_file_name
         abs_output_path = str(output_file.resolve())
@@ -575,8 +567,8 @@ async def test_notebook_export(file_tools, fixture_notebook_path):
         await file_tools.notebook_export(fixture_notebook_path, fmt, abs_output_path)
         
         assert output_file.exists()
-        assert output_file.stat().st_size > 0 # Exported file should not be empty
-        os.remove(output_file) # Clean up
+        assert output_file.stat().st_size > 0
+        os.remove(output_file)
 
 @pytest.mark.asyncio
 async def test_notebook_export_success(file_tools, fixture_notebook_path):
@@ -588,8 +580,8 @@ async def test_notebook_export_success(file_tools, fixture_notebook_path):
     assert f"Successfully exported notebook to {output_py_path_str}" in result
     with open(output_py_path_str, 'r') as f:
         content = f.read()
-        assert "# coding: utf-8" in content # Standard for nbconvert python export
-        assert "Hello from cell 1" in content # Check for content from fixture
+        assert "# coding: utf-8" in content
+        assert "Hello from cell 1" in content
     if os.path.exists(output_py_path_str): 
         os.remove(output_py_path_str)
 
@@ -609,7 +601,7 @@ async def test_notebook_export_overwrite(file_tools, fixture_notebook_path):
     with open(output_path_str, 'r') as f:
         content = f.read()
         assert "dummy content to be overwritten" not in content
-        assert "<title>test_notebook</title>" in content # from fixture notebook metadata
+        assert "<title>test_notebook</title>" in content
     if os.path.exists(output_path_str):
         os.remove(output_path_str)
 
@@ -638,7 +630,6 @@ async def test_notebook_export_source_not_found(file_tools):
 
 @pytest.mark.asyncio
 async def test_notebook_export_error_conditions(file_tools, fixture_notebook_path):
-    # Test various path validation errors for notebook_export
     valid_source = fixture_notebook_path
     valid_output_dir = TEMP_FIXTURE_COPIES_DIR
     
@@ -669,21 +660,12 @@ async def test_notebook_export_error_conditions(file_tools, fixture_notebook_pat
 
 @pytest.mark.asyncio
 async def test_diagnose_imports(diagnostic_tools):
-    # This test primarily checks that the function runs without error and returns a string.
-    # It assumes essential libraries are installed in the test environment.
-    # A more robust test might mock `importlib.util.find_spec` for specific scenarios.
     result = await diagnostic_tools.diagnose_imports()
     assert isinstance(result, str)
-    assert "Import Diagnostics (OK)" in result # Assuming all core libs are present
+    assert "Import Diagnostics (OK)" in result
     assert "nbformat" in result
     assert "nbconvert" in result
-    assert "fastmcp" in result # This might not be importable directly depending on how tests are run
+    assert "fastmcp" in result
     assert "uvicorn" in result
     assert "starlette" in result
     assert "sse_starlette" in result
-
-    # Example of how one might test a failure (requires more setup/mocking)
-    # with patch('importlib.util.find_spec', return_value=None):
-    #     result_fail = await diagnostic_tools.diagnose_imports()
-    #     assert "Import Diagnostics (FAIL)" in result_fail
-    #     assert "[FAIL] nbformat: Not found" in result_fail # If nbformat was mocked as not found

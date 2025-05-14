@@ -5,7 +5,8 @@ from ..core import notebook_ops
 from ..core.config import ServerConfig
 
 class MetadataToolsProvider:
-    """Provides MCP tools for managing notebook and cell metadata."""
+    """Provides tools for reading and writing notebook and cell metadata."""
+
     def __init__(self, config: ServerConfig):
         self.config = config
         self.read_notebook = notebook_ops.read_notebook
