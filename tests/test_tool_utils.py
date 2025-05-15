@@ -71,14 +71,7 @@ def test_extract_markdown_outline_no_headings():
 
 
 def test_extract_markdown_outline_simple_headings():
-    source = (
-        "# Header 1\n"
-        "## Header 2\n"
-        "### Header 3\n"
-        "#### Header 4\n"
-        "##### Header 5\n"
-        "###### Header 6"
-    )
+    source = "# Header 1\n## Header 2\n### Header 3\n#### Header 4\n##### Header 5\n###### Header 6"
     expected = [
         (1, "Header 1"),
         (2, "Header 2"),
@@ -91,12 +84,7 @@ def test_extract_markdown_outline_simple_headings():
 
 
 def test_extract_markdown_outline_with_text_and_spaces():
-    source = (
-        "  #  Spaced Header 1  \n"
-        "Some text\n"
-        "##Another Header 2\n"
-        "### Header with ### in it"
-    )
+    source = "  #  Spaced Header 1  \nSome text\n##Another Header 2\n### Header with ### in it"
     expected = [
         (1, "Spaced Header 1"),
         (3, "Header with ### in it"),
@@ -138,16 +126,7 @@ def test_get_first_line_context_less_than_max():
 
 
 def test_get_first_line_context_with_leading_comments_and_empty():
-    source = (
-        "# Comment\n"
-        "\n"
-        "  \t \n"
-        "actual_line1\n"
-        "# Another comment\n"
-        "actual_line2\n"
-        "actual_line3\n"
-        "actual_line4"
-    )
+    source = "# Comment\n\n  \t \nactual_line1\n# Another comment\nactual_line2\nactual_line3\nactual_line4"
     expected = ["actual_line1", "actual_line2", "actual_line3"]
     assert get_first_line_context(source) == expected
 

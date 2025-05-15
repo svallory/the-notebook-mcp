@@ -35,33 +35,21 @@ class FileToolsProvider:
         try:
             # --- Security and Existence Check (Before Write) ---
             if not os.path.isabs(notebook_path):
-                raise ValueError(
-                    "Invalid notebook path: Only absolute paths are allowed."
-                )
+                raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
             # Use imported notebook_ops.is_path_allowed
-            if not notebook_ops.is_path_allowed(
-                notebook_path, self.config.allow_root_dirs
-            ):
-                raise PermissionError(
-                    "Access denied: Path is outside the allowed workspace roots."
-                )
+            if not notebook_ops.is_path_allowed(notebook_path, self.config.allow_root_dirs):
+                raise PermissionError("Access denied: Path is outside the allowed workspace roots.")
 
             resolved_path = os.path.realpath(notebook_path)
             if not resolved_path.endswith(".ipynb"):
-                raise ValueError(
-                    f"Invalid file type: '{resolved_path}' must point to a .ipynb file."
-                )
+                raise ValueError(f"Invalid file type: '{resolved_path}' must point to a .ipynb file.")
             if os.path.exists(resolved_path):
-                raise FileExistsError(
-                    f"Cannot create notebook, file already exists: {resolved_path}"
-                )
+                raise FileExistsError(f"Cannot create notebook, file already exists: {resolved_path}")
 
             # --- Create and Write ---
             nb = nbformat.v4.new_notebook()
             # Use imported notebook_ops.write_notebook
-            await notebook_ops.write_notebook(
-                notebook_path, nb, self.config.allow_root_dirs
-            )
+            await notebook_ops.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
 
             logger.info(
                 f"[Tool: notebook_create] SUCCESS - Created new notebook at {resolved_path}",
@@ -80,9 +68,7 @@ class FileToolsProvider:
             raise
         except Exception as e:
             logger.exception(f"[Tool: notebook_create] FAILED - Unexpected error: {e}")
-            raise RuntimeError(
-                f"An unexpected error occurred during notebook creation: {e}"
-            ) from e
+            raise RuntimeError(f"An unexpected error occurred during notebook creation: {e}") from e
 
     async def notebook_delete(self, notebook_path: str) -> str:
         """Deletes a Jupyter Notebook (.ipynb) file at the specified path.
@@ -96,15 +82,9 @@ class FileToolsProvider:
         try:
             # Security Checks
             if not os.path.isabs(notebook_path):
-                raise ValueError(
-                    "Invalid notebook path: Only absolute paths are allowed."
-                )
-            if not notebook_ops.is_path_allowed(
-                notebook_path, self.config.allow_root_dirs
-            ):
-                raise PermissionError(
-                    "Access denied: Path is outside the allowed workspace roots."
-                )
+                raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
+            if not notebook_ops.is_path_allowed(notebook_path, self.config.allow_root_dirs):
+                raise PermissionError("Access denied: Path is outside the allowed workspace roots.")
             if not notebook_path.endswith(".ipynb"):
                 raise ValueError("Invalid file type: Path must point to a .ipynb file.")
 
@@ -128,9 +108,7 @@ class FileToolsProvider:
             raise IOError(f"Failed to delete notebook file due to OS error: {e}") from e
         except Exception as e:
             logger.exception(f"[Tool: notebook_delete] FAILED - Unexpected error: {e}")
-            raise RuntimeError(
-                f"An unexpected error occurred during notebook deletion: {e}"
-            ) from e
+            raise RuntimeError(f"An unexpected error occurred during notebook deletion: {e}") from e
 
     async def notebook_rename(self, old_path: str, new_path: str) -> str:
         """Renames/Moves a Jupyter Notebook (.ipynb) file from one path to another.
@@ -140,40 +118,26 @@ class FileToolsProvider:
             new_path: The absolute path where the notebook file should be moved/renamed to.
                       Both paths must be within an allowed root directory.
         """
-        logger.debug(
-            f"[Tool: notebook_rename] Called. Args: old={old_path}, new={new_path}"
-        )
+        logger.debug(f"[Tool: notebook_rename] Called. Args: old={old_path}, new={new_path}")
 
         try:
             # Security Checks
             if not os.path.isabs(old_path) or not os.path.isabs(new_path):
-                raise ValueError(
-                    "Invalid notebook path(s): Only absolute paths are allowed."
-                )
+                raise ValueError("Invalid notebook path(s): Only absolute paths are allowed.")
             if not notebook_ops.is_path_allowed(
                 old_path, self.config.allow_root_dirs
-            ) or not notebook_ops.is_path_allowed(
-                new_path, self.config.allow_root_dirs
-            ):
-                raise PermissionError(
-                    "Access denied: One or both paths are outside the allowed workspace roots."
-                )
+            ) or not notebook_ops.is_path_allowed(new_path, self.config.allow_root_dirs):
+                raise PermissionError("Access denied: One or both paths are outside the allowed workspace roots.")
             if not old_path.endswith(".ipynb") or not new_path.endswith(".ipynb"):
-                raise ValueError(
-                    "Invalid file type: Both paths must point to .ipynb files."
-                )
+                raise ValueError("Invalid file type: Both paths must point to .ipynb files.")
 
             resolved_old_path = os.path.realpath(old_path)
             resolved_new_path = os.path.realpath(new_path)
 
             if not os.path.isfile(resolved_old_path):
-                raise FileNotFoundError(
-                    f"Source notebook file not found at: {resolved_old_path}"
-                )
+                raise FileNotFoundError(f"Source notebook file not found at: {resolved_old_path}")
             if os.path.exists(resolved_new_path):
-                raise FileExistsError(
-                    f"Cannot rename notebook, destination already exists: {resolved_new_path}"
-                )
+                raise FileExistsError(f"Cannot rename notebook, destination already exists: {resolved_new_path}")
 
             # Create parent directory of destination if it doesn't exist
             os.makedirs(os.path.dirname(resolved_new_path), exist_ok=True)
@@ -193,18 +157,14 @@ class FileToolsProvider:
             FileExistsError,
             OSError,
         ) as e:
-            if isinstance(
-                e, (ValueError, PermissionError, FileNotFoundError, FileExistsError)
-            ):
+            if isinstance(e, (ValueError, PermissionError, FileNotFoundError, FileExistsError)):
                 logger.error(f"[Tool: notebook_rename] FAILED - {e}")
                 raise
             logger.error(f"[Tool: notebook_rename] FAILED - OS error: {e}")
             raise IOError(f"Failed to rename notebook file due to OS error: {e}") from e
         except Exception as e:
             logger.exception(f"[Tool: notebook_rename] FAILED - Unexpected error: {e}")
-            raise RuntimeError(
-                f"An unexpected error occurred during notebook rename: {e}"
-            ) from e
+            raise RuntimeError(f"An unexpected error occurred during notebook rename: {e}") from e
 
     async def notebook_validate(self, notebook_path: str) -> str:
         """Validates a Jupyter Notebook file against the nbformat schema.
@@ -218,38 +178,24 @@ class FileToolsProvider:
         logger.debug(f"[Tool: notebook_validate] Called. Args: path={notebook_path}")
         try:
             # This will raise ValidationError if invalid
-            nb = await notebook_ops.read_notebook(
-                notebook_path, self.config.allow_root_dirs
-            )
+            nb = await notebook_ops.read_notebook(notebook_path, self.config.allow_root_dirs)
             nbformat.validate(nb)  # Explicitly validate after reading
-            logger.info(
-                f"[Tool: notebook_validate] SUCCESS - Notebook format is valid."
-            )
+            logger.info(f"[Tool: notebook_validate] SUCCESS - Notebook format is valid.")
             return "Notebook format is valid."
         except (
             nbformat.validator.ValidationError,
             jsonschema.exceptions.ValidationError,
         ) as e:
-            logger.error(
-                f"[Tool: notebook_validate] FAILED - Notebook validation error: {e}"
-            )
+            logger.error(f"[Tool: notebook_validate] FAILED - Notebook validation error: {e}")
             return f"Notebook validation failed: {e}"
         except (PermissionError, FileNotFoundError, ValueError, IOError) as e:
-            logger.error(
-                f"[Tool: notebook_validate] FAILED - Could not read notebook for validation: {e}"
-            )
+            logger.error(f"[Tool: notebook_validate] FAILED - Could not read notebook for validation: {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_validate] FAILED - Unexpected error during validation: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred during notebook validation: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_validate] FAILED - Unexpected error during validation: {e}")
+            raise RuntimeError(f"An unexpected error occurred during notebook validation: {e}") from e
 
-    async def notebook_export(
-        self, notebook_path: str, export_format: str, output_path: str
-    ) -> str:
+    async def notebook_export(self, notebook_path: str, export_format: str, output_path: str) -> str:
         """Exports a Jupyter Notebook to a specified format using nbconvert.
 
         Args:
@@ -272,12 +218,8 @@ class FileToolsProvider:
                 raise ValueError("Invalid path(s): Only absolute paths are allowed.")
             if not notebook_ops.is_path_allowed(
                 notebook_path, self.config.allow_root_dirs
-            ) or not notebook_ops.is_path_allowed(
-                output_path, self.config.allow_root_dirs
-            ):
-                raise PermissionError(
-                    "Access denied: One or both paths are outside the allowed workspace roots."
-                )
+            ) or not notebook_ops.is_path_allowed(output_path, self.config.allow_root_dirs):
+                raise PermissionError("Access denied: One or both paths are outside the allowed workspace roots.")
             if not notebook_path.endswith(".ipynb"):
                 raise ValueError("Invalid source file type: Must be a .ipynb file.")
 
@@ -285,13 +227,9 @@ class FileToolsProvider:
             resolved_output_path = os.path.realpath(output_path)
 
             if not os.path.isfile(resolved_source_path):
-                raise FileNotFoundError(
-                    f"Source notebook file not found: {resolved_source_path}"
-                )
+                raise FileNotFoundError(f"Source notebook file not found: {resolved_source_path}")
             if os.path.exists(resolved_output_path):
-                logger.warning(
-                    f"[Tool: notebook_export] Overwriting existing file at {resolved_output_path}"
-                )
+                logger.warning(f"[Tool: notebook_export] Overwriting existing file at {resolved_output_path}")
 
             os.makedirs(os.path.dirname(resolved_output_path), exist_ok=True)
 
@@ -305,13 +243,9 @@ class FileToolsProvider:
                 resolved_output_path,
                 resolved_source_path,
             ]
-            logger.debug(
-                f"[Tool: notebook_export] Executing nbconvert command: {' '.join(cmd)}"
-            )
+            logger.debug(f"[Tool: notebook_export] Executing nbconvert command: {' '.join(cmd)}")
 
-            process = subprocess.run(
-                cmd, capture_output=True, text=True, encoding="utf-8", check=False
-            )
+            process = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", check=False)
 
             if process.returncode != 0:
                 error_message = f"nbconvert failed (exit code {process.returncode}).\nStderr: {process.stderr}\nStdout: {process.stdout}"
@@ -320,9 +254,7 @@ class FileToolsProvider:
 
             if not os.path.isfile(resolved_output_path):
                 expected_dir = os.path.dirname(resolved_output_path)
-                base_name_orig_output = os.path.splitext(
-                    os.path.basename(resolved_output_path)
-                )[0]
+                base_name_orig_output = os.path.splitext(os.path.basename(resolved_output_path))[0]
 
                 # nbconvert might append its own default extension, esp. for 'python'
                 # e.g. --output foo.python --to python -> foo.py (not foo.python.py)
@@ -341,28 +273,16 @@ class FileToolsProvider:
                 # Check if nbconvert used the basename of output_path and added its default extension
                 # e.g. if output_path = /d/file.script and format = 'python', check for /d/file.py
                 if export_format == "python":
-                    possible_output_paths.append(
-                        os.path.join(expected_dir, base_name_orig_output + ".py")
-                    )
+                    possible_output_paths.append(os.path.join(expected_dir, base_name_orig_output + ".py"))
                 else:
                     # For other formats, it might create base_name.export_format
-                    possible_output_paths.append(
-                        os.path.join(
-                            expected_dir, f"{base_name_orig_output}.{export_format}"
-                        )
-                    )
+                    possible_output_paths.append(os.path.join(expected_dir, f"{base_name_orig_output}.{export_format}"))
 
                 # Also consider if nbconvert just used the source notebook's basename in the output_dir
-                source_basename = os.path.splitext(
-                    os.path.basename(resolved_source_path)
-                )[0]
-                possible_output_paths.append(
-                    os.path.join(expected_dir, f"{source_basename}.{export_format}")
-                )
+                source_basename = os.path.splitext(os.path.basename(resolved_source_path))[0]
+                possible_output_paths.append(os.path.join(expected_dir, f"{source_basename}.{export_format}"))
                 if export_format == "python":  # And python specific for source basename
-                    possible_output_paths.append(
-                        os.path.join(expected_dir, f"{source_basename}.py")
-                    )
+                    possible_output_paths.append(os.path.join(expected_dir, f"{source_basename}.py"))
 
                 found_path = None
                 for p_path in possible_output_paths:
@@ -383,9 +303,7 @@ class FileToolsProvider:
                         raise IOError(
                             f"nbconvert created output at {found_path}, but failed to rename to {resolved_output_path}: {rename_err}"
                         ) from rename_err
-                elif not os.path.isfile(
-                    resolved_output_path
-                ):  # Check again after potential rename
+                elif not os.path.isfile(resolved_output_path):  # Check again after potential rename
                     error_message = f"nbconvert completed but output file not found at expected path: {resolved_output_path} or variations tried: {possible_output_paths}."
                     logger.error(
                         f"[Tool: notebook_export] FAILED - {error_message}\nnbconvert stdout: {process.stdout}\nnbconvert stderr: {process.stderr}"
@@ -410,9 +328,5 @@ class FileToolsProvider:
             logger.error(f"[Tool: notebook_export] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_export] FAILED - Unexpected error during export: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred during notebook export: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_export] FAILED - Unexpected error during export: {e}")
+            raise RuntimeError(f"An unexpected error occurred during notebook export: {e}") from e

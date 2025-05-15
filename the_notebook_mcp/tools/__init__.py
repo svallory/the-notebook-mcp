@@ -5,7 +5,6 @@ from .file_tools import FileToolsProvider
 from .info_tools import InfoToolsProvider
 from .metadata_tools import MetadataToolsProvider
 from .output_tools import OutputToolsProvider
-from .diagnostic_tools import DiagnosticToolsProvider
 
 __all__ = [
     "CellToolsProvider",
@@ -13,5 +12,4 @@ __all__ = [
     "InfoToolsProvider",
     "MetadataToolsProvider",
     "OutputToolsProvider",
-    "DiagnosticToolsProvider",
 ]

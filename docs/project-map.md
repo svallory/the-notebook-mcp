@@ -120,12 +120,4 @@ This document provides a summary of the Python files, classes, and functions wit
         *   `__init__(self, config: ServerConfig)`: Initializes the provider with server configuration.
         *   `notebook_read_cell_output(self, notebook_path: str, cell_index: int) -> List[dict]`: Reads the list of output objects for a specific code cell.
         *   `notebook_clear_cell_outputs(self, notebook_path: str, cell_index: int) -> str`: Clears outputs and execution count for a specific code cell.
-        *   `notebook_clear_all_outputs(self, notebook_path: str) -> str`: Clears outputs and execution counts for all code cells in the notebook.
-
-### `the_notebook_mcp/tools/diagnostic_tools.py`
-
-*   **Summary:** Provides diagnostic tools, primarily for checking the availability and importability of essential and optional library dependencies.
-*   **Classes:**
-    *   `DiagnosticToolsProvider`: Encapsulates diagnostic tools.
-        *   `__init__(self, config: ServerConfig)`: Initializes the provider with server configuration.
-        *   `diagnose_imports(self) -> str`: Checks if key libraries (`nbformat`, `nbconvert`, `fastmcp`, `uvicorn`, etc.) can be imported, logging details and returning a summary string. 
+        *   `notebook_clear_all_outputs(self, notebook_path: str) -> str`: Clears outputs and execution counts for all code cells in the notebook. 

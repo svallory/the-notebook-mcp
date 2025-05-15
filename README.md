@@ -4,7 +4,7 @@
 
 A Model Context Protocol (MCP) server that enables AI agents to interact with Jupyter Notebook (`.ipynb`) files. Designed to overcome limitations with Cursor's AI agent mode, this tool allows AI assistants to directly manipulate notebook cells and structure through a secure, well-defined API.
 
-**Current Version:** `0.8.0` - See the [CHANGELOG.md](CHANGELOG.md) for details on recent changes.
+**Current Version:** `0.9.0` - See the [CHANGELOG.md](CHANGELOG.md) for details on recent changes.
 
 ## Why Use This?
 
@@ -63,6 +63,10 @@ The server provides the following MCP tools:
 * `notebook_duplicate_cell`: Duplicates a cell multiple times
 * `notebook_split_cell`: Splits a cell into two at a specified line number
 * `notebook_merge_cells`: Merges a cell with the one immediately following it
+* `notebook_execute_cell`: Executes a code cell and returns its outputs
+  * Note: Requires an active Jupyter server
+  * Example: `notebook_execute_cell('/path/to/notebook.ipynb', 1, server_url='http://localhost:8888', token='your-token')`
+  * Kernel state is preserved between calls, allowing variables defined in earlier cells to be accessed in later cells
 
 ### Metadata and Outputs
 * `notebook_read_metadata`: Reads the top-level notebook metadata
@@ -72,9 +76,6 @@ The server provides the following MCP tools:
 * `notebook_read_cell_output`: Reads the output list of a specific code cell
 * `notebook_clear_cell_outputs`: Clears the outputs and execution count of a specific cell
 * `notebook_clear_all_outputs`: Clears outputs and execution counts for all code cells
-
-### Diagnostics
-* `diagnose_imports`: Checks if essential libraries are importable and logs details
 
 ## Requirements
 
@@ -225,7 +226,6 @@ Start the server separately, then configure Cursor:
 
 ## Limitations and Security
 
-* **No Cell Execution:** This server cannot execute notebook cells - it only manipulates notebook structure
 * **Security Measures:**
   * Paths are restricted to allowed root directories
   * Size limits on cell sources and outputs

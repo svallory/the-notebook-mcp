@@ -34,9 +34,7 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def log_formatter(record: dict) -> str:
@@ -71,9 +69,7 @@ def log_formatter(record: dict) -> str:
     )
 
 
-def setup_logging(
-    log_dir_path: str, log_level_str: str, in_prod_like_env: bool = False
-) -> None:
+def setup_logging(log_dir_path: str, log_level_str: str, in_prod_like_env: bool = False) -> None:
     """
     Configures Loguru handlers for console and file logging.
 
@@ -130,13 +126,9 @@ def setup_logging(
 
             logger.debug(f"File logging enabled: {log_file_path}")
         except OSError as e:
-            logger.error(
-                f"Could not create log directory or file {log_dir_path}: {e}. File logging disabled."
-            )
+            logger.error(f"Could not create log directory or file {log_dir_path}: {e}. File logging disabled.")
     else:
         logger.warning("No log directory specified. File logging disabled.")
 
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
-    logger.debug(
-        f"Logging initialized. Console level: {console_log_level}. Intercepting standard logging."
-    )
+    logger.debug(f"Logging initialized. Console level: {console_log_level}. Intercepting standard logging.")

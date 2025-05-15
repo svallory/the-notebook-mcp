@@ -16,7 +16,6 @@ from .tools import (
     InfoToolsProvider,
     MetadataToolsProvider,
     OutputToolsProvider,
-    DiagnosticToolsProvider,
 )
 from .cli import parse_arguments
 from .core.logging import setup_logging
@@ -27,14 +26,10 @@ try:
     from loguru import logger
 except ImportError as e:
     missing_module = str(e).split("'")[1]
-    logger.critical(
-        f"FATAL: Failed to import required library '{missing_module}'. Error: {e}"
-    )
+    logger.critical(f"FATAL: Failed to import required library '{missing_module}'. Error: {e}")
     # Add hint about installing extras if it's an SSE component missing
     if "uvicorn" in str(e) or "starlette" in str(e):
-        logger.error(
-            "Hint: SSE transport requires optional dependencies. Try installing with '[sse]' extra."
-        )
+        logger.error("Hint: SSE transport requires optional dependencies. Try installing with '[sse]' extra.")
     sys.exit(1)
 
 
@@ -64,20 +59,15 @@ def setup_mcp_server(config: ServerConfig) -> FastMCP:
         InfoToolsProvider(config),
         MetadataToolsProvider(config),
         OutputToolsProvider(config),
-        DiagnosticToolsProvider(config),
     ]
 
     logger.debug("Registering tools with FastMCP...")
     registered_count = 0
     for provider_instance in providers:
-        for name, method in inspect.getmembers(
-            provider_instance, predicate=inspect.iscoroutinefunction
-        ):
+        for name, method in inspect.getmembers(provider_instance, predicate=inspect.iscoroutinefunction):
             # Basic check: assume public coroutine methods starting with 'notebook_' or 'diagnose_'
             # are intended as tools. Could use a decorator later for more robustness.
-            if (
-                name.startswith("notebook_") or name.startswith("diagnose_")
-            ) and not name.startswith("_"):
+            if (name.startswith("notebook_")) and not name.startswith("_"):
                 try:
                     mcp_server.add_tool(method)
                     registered_count += 1
@@ -89,9 +79,7 @@ def setup_mcp_server(config: ServerConfig) -> FastMCP:
                     )
 
     if registered_count == 0:
-        logger.warning(
-            "No tools were registered. Check provider methods and registration logic."
-        )
+        logger.warning("No tools were registered. Check provider methods and registration logic.")
     else:
         logger.debug(f"Successfully registered {registered_count} tools.")
 
@@ -109,11 +97,7 @@ def main():
     if args.command == "version":
         print(f"the_notebook_mcp.server {ServerConfig().version}")
         sys.exit(0)
-    elif (
-        args.command == "help"
-        and hasattr(args, "help_cmd_show_version")
-        and args.help_cmd_show_version
-    ):
+    elif args.command == "help" and hasattr(args, "help_cmd_show_version") and args.help_cmd_show_version:
         print(f"the_notebook_mcp.server {ServerConfig().version}")
         sys.exit(0)
 
@@ -126,9 +110,7 @@ def main():
         logger.error(f"Configuration error: {e}")
         sys.exit(1)
     except Exception as e:
-        logger.opt(exception=True).critical(
-            f"Unexpected error during argument parsing or config initialization: {e}"
-        )
+        logger.opt(exception=True).critical(f"Unexpected error during argument parsing or config initialization: {e}")
         sys.exit(1)
 
     startup_message = branding.get_server_startup_message(config)
@@ -144,18 +126,14 @@ def main():
             logger.debug(f"Starting server with {config.transport.upper()} transport.")
             mcp_server.run(**config.get_run_kwargs())
         else:
-            logger.critical(
-                f"Invalid transport specified: {config.transport}. Exiting."
-            )
+            logger.critical(f"Invalid transport specified: {config.transport}. Exiting.")
             sys.exit(1)
 
     except KeyboardInterrupt:
         logger.info("Server shutting down due to KeyboardInterrupt (Ctrl+C).")
         sys.exit(0)
     except Exception as e:
-        logger.opt(exception=True).critical(
-            f"Critical unexpected error in server execution: {e}"
-        )
+        logger.opt(exception=True).critical(f"Critical unexpected error in server execution: {e}")
         sys.exit(1)
 
 

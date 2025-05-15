@@ -59,9 +59,7 @@ class InfoToolsProvider:
             raise
         except Exception as e:
             logger.exception(f"[Tool: notebook_read] FAILED - Unexpected error: {e}")
-            raise RuntimeError(
-                f"An unexpected error occurred while reading the notebook: {e}"
-            ) from e
+            raise RuntimeError(f"An unexpected error occurred while reading the notebook: {e}") from e
 
     async def notebook_read_cell(self, notebook_path: str, cell_index: int) -> str:
         """Reads the source content of a specific cell in a Jupyter Notebook.
@@ -73,15 +71,11 @@ class InfoToolsProvider:
         Returns:
             The source content (string) of the specified cell.
         """
-        logger.debug(
-            f"[Tool: notebook_read_cell] Called. Args: path={notebook_path}, index={cell_index}"
-        )
+        logger.debug(f"[Tool: notebook_read_cell] Called. Args: path={notebook_path}, index={cell_index}")
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
-                raise IndexError(
-                    f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1})."
-                )
+                raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1}).")
 
             cell = nb.cells[cell_index]
             source = cell.get("source", "")
@@ -107,12 +101,8 @@ class InfoToolsProvider:
             logger.error(f"[Tool: notebook_read_cell] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_read_cell] FAILED - Unexpected error: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while reading cell {cell_index}: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_read_cell] FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred while reading cell {cell_index}: {e}") from e
 
     async def notebook_get_cell_count(self, notebook_path: str) -> int:
         """Gets the total number of cells in a Jupyter Notebook.
@@ -123,9 +113,7 @@ class InfoToolsProvider:
         Returns:
             The integer count of cells in the notebook.
         """
-        logger.debug(
-            f"[Tool: notebook_get_cell_count] Called. Args: path={notebook_path}"
-        )
+        logger.debug(f"[Tool: notebook_get_cell_count] Called. Args: path={notebook_path}")
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             count = len(nb.cells)
@@ -144,12 +132,8 @@ class InfoToolsProvider:
             logger.error(f"[Tool: notebook_get_cell_count] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_get_cell_count] FAILED - Unexpected error: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while getting cell count: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_get_cell_count] FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred while getting cell count: {e}") from e
 
     async def notebook_get_info(self, notebook_path: str) -> dict:
         """Gets basic information about a Jupyter Notebook file.
@@ -165,13 +149,9 @@ class InfoToolsProvider:
         try:
             # Basic path validation first
             if not os.path.isabs(notebook_path):
-                raise ValueError(
-                    "Invalid notebook path: Only absolute paths are allowed."
-                )
+                raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
             if not self.is_path_allowed(notebook_path, self.config.allow_root_dirs):
-                raise PermissionError(
-                    "Access denied: Path is outside the allowed workspace roots."
-                )
+                raise PermissionError("Access denied: Path is outside the allowed workspace roots.")
             if not notebook_path.endswith(".ipynb"):
                 raise ValueError("Invalid file type: Path must point to a .ipynb file.")
 
@@ -194,9 +174,7 @@ class InfoToolsProvider:
                 "cell_count": len(nb.cells),
                 "nbformat": nb.nbformat,
                 "nbformat_minor": nb.nbformat_minor,
-                "metadata_keys": list(
-                    nb.metadata.keys()
-                ),  # List top-level metadata keys
+                "metadata_keys": list(nb.metadata.keys()),  # List top-level metadata keys
             }
 
             info = {**file_info, **notebook_info}
@@ -217,16 +195,10 @@ class InfoToolsProvider:
             logger.error(f"[Tool: notebook_get_info] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_get_info] FAILED - Unexpected error: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while getting notebook info: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_get_info] FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred while getting notebook info: {e}") from e
 
-    async def notebook_get_outline(
-        self, notebook_path: str
-    ) -> List[Dict[str, Union[int, str, List[str]]]]:
+    async def notebook_get_outline(self, notebook_path: str) -> List[Dict[str, Union[int, str, List[str]]]]:
         """Generates a structural outline of the notebook (headings, function/class definitions).
 
         Args:
@@ -266,9 +238,7 @@ class InfoToolsProvider:
                     # Option 2: Separate entry for each major definition (can be noisy)
 
                     # Using Option 1: Single entry for the code cell
-                    if (
-                        code_defs or first_lines
-                    ):  # Only add if there's something interesting
+                    if code_defs or first_lines:  # Only add if there's something interesting
                         # Use the first definition or first line as the main text
                         main_text = code_defs[0] if code_defs else first_lines[0]
                         outline.append(
@@ -298,12 +268,8 @@ class InfoToolsProvider:
             logger.error(f"[Tool: notebook_get_outline] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_get_outline] FAILED - Unexpected error generating outline: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while generating the notebook outline: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_get_outline] FAILED - Unexpected error generating outline: {e}")
+            raise RuntimeError(f"An unexpected error occurred while generating the notebook outline: {e}") from e
 
     async def notebook_search(
         self, notebook_path: str, query: str, case_sensitive: bool = False
@@ -363,9 +329,5 @@ class InfoToolsProvider:
             logger.error(f"[Tool: notebook_search] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_search] FAILED - Unexpected error during search: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while searching the notebook: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_search] FAILED - Unexpected error during search: {e}")
+            raise RuntimeError(f"An unexpected error occurred while searching the notebook: {e}") from e

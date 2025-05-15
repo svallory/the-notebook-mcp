@@ -56,10 +56,7 @@ def get_server_startup_message(config: ServerConfig = None) -> str:
 
     box_width = banner["width"] - 2
     directories = "\n".join(
-        [
-            f"│  - {dir_path} {'':<{box_width - len(dir_path) - 5}}│"
-            for dir_path in config.allow_root_dirs
-        ]
+        [f"│  - {dir_path} {'':<{box_width - len(dir_path) - 5}}│" for dir_path in config.allow_root_dirs]
     )
 
     # Format connection information based on transport
@@ -75,9 +72,7 @@ def get_server_startup_message(config: ServerConfig = None) -> str:
     else:
         # HTTP-based transports (streamable-http or sse)
         url = f"http://{config.host}:{config.port}"
-        transport_name = (
-            "Streamable HTTP" if config.transport == "streamable-http" else "SSE"
-        )
+        transport_name = "Streamable HTTP" if config.transport == "streamable-http" else "SSE"
         connection_box = f"""
 ╭{"─" * box_width}╮
 │ <green>Server running</green> <dim>{transport_name}</dim> <yellow>{"Press <lr>Ctrl+C</lr> to exit":>{box_width - len(transport_name) - 9}}</yellow> │
@@ -88,6 +83,4 @@ def get_server_startup_message(config: ServerConfig = None) -> str:
 ╰{"─" * box_width}╯
 """
 
-    return (
-        f"{banner['text']}\n<magenta>{centered_version}</magenta>\n{connection_box}\n"
-    )
+    return f"{banner['text']}\n<magenta>{centered_version}</magenta>\n{connection_box}\n"

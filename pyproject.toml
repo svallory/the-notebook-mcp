@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.0.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "the-notebook-mcp"
-version = "0.8.0"
+dynamic = ["version"]
 authors = [
   { name="Saulo Vallory", email="me@saulo.engineer" },
 ]
@@ -12,20 +12,17 @@ description = "Model Context Protocol (MCP) implementation for Jupyter notebooks
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-keywords = ["jupyter", "notebook", "mcp", "cursor", "ai", "agent", "nbformat", "ipynb", "fastmcp"]
+keywords = ["jupyter", "notebook", "mcp", "cursor", "windsurf", "ai", "agent", "nbformat", "ipynb", "fastmcp"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Jupyter",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3 :: Only",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -39,7 +36,10 @@ dependencies = [
     "ipython",
     "jupyter_core",
     "loguru>=0.7.3",
+    "jupyter-kernel-client>=0.6.0",
+    "jupyter-nbmodel-client>=0.11.3",
 ]
+
 
 [project.optional-dependencies]
 sse = [
@@ -47,15 +47,19 @@ sse = [
     "starlette>=0.25.0"
 ]
 test = [
-    "pytest>=7.0",
+    "coveralls",
+    "ipykernel>=6.29.5",
+    "jupyter-server>=2.16.0",
     "pytest-asyncio>=0.18",
     "pytest-cov",
-    "coveralls",
-    "pytest-mock"
+    "pytest-mock",
+    "pytest>=8.3.5",
 ]
 dev = [
-    "ruff>=0.11.9",
+    "mypy>=1.15.0",
+    "poethepoet>=0.34.0",
     "pre-commit>=4.2.0",
+    "ruff>=0.11.9",
 ]
 
 [project.urls]
@@ -68,6 +72,9 @@ the-notebook-mcp = "the_notebook_mcp.server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["the_notebook_mcp"]
+
+[tool.hatch.version]
+path = "the_notebook_mcp/__version__.py"
 
 [tool.pytest.ini_options]
 addopts = "--cov=the_notebook_mcp --cov-report=term-missing --cov-report=html -m 'not slow'"
@@ -97,11 +104,6 @@ exclude_lines = [
 [tool.coverage.html]
 directory = "htmlcov"
 
-[dependency-groups]
-dev = [
-    "poethepoet>=0.34.0",
-]
-
 [tool.poe.tasks]
 start = "python -m the_notebook_mcp.server start --allow-root $POE_PWD"
 check-help = "python -m the_notebook_mcp.server help"
@@ -114,3 +116,18 @@ check-start-http = "gtimeout 5s poe start --transport streamable-http"
 [tool.poe.tasks.test]
 cmd = "python -m pytest"
 env.JUPYTER_PLATFORM_DIRS = "1"
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+pretty = true
+show_error_context = true
+show_error_codes = true
+strict_equality = true
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[tool.ruff]
+line-length = 120

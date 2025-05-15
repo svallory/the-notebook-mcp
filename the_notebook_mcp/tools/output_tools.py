@@ -21,9 +21,7 @@ class OutputToolsProvider:
         self.is_path_allowed = notebook_ops.is_path_allowed
         logger.debug("OutputToolsProvider initialized.")
 
-    async def notebook_read_cell_output(
-        self, notebook_path: str, cell_index: int
-    ) -> List[dict]:
+    async def notebook_read_cell_output(self, notebook_path: str, cell_index: int) -> List[dict]:
         """Reads the output of a specific code cell.
 
         Args:
@@ -35,15 +33,11 @@ class OutputToolsProvider:
             (following the nbformat output structure).
             Returns an empty list if the cell is not a code cell or has no outputs.
         """
-        logger.debug(
-            f"[Tool: notebook_read_cell_output] Called. Args: path={notebook_path}, index={cell_index}"
-        )
+        logger.debug(f"[Tool: notebook_read_cell_output] Called. Args: path={notebook_path}, index={cell_index}")
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
-                raise IndexError(
-                    f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1})."
-                )
+                raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1}).")
 
             cell = nb.cells[cell_index]
             if cell.cell_type != "code":
@@ -58,10 +52,7 @@ class OutputToolsProvider:
                 if "data" in output_dict and isinstance(output_dict["data"], dict):
                     for mime_type, data_content in output_dict["data"].items():
                         if isinstance(data_content, str):
-                            if (
-                                len(data_content.encode("utf-8"))
-                                > self.config.max_cell_output_size
-                            ):
+                            if len(data_content.encode("utf-8")) > self.config.max_cell_output_size:
                                 if mime_type.startswith("image/"):
                                     output_dict["data"][mime_type] = (
                                         f"<image data too large: {len(data_content.encode('utf-8'))} bytes>"
@@ -75,10 +66,7 @@ class OutputToolsProvider:
                                 )
                         elif isinstance(data_content, list):
                             data_as_str = "".join(data_content)
-                            if (
-                                len(data_as_str.encode("utf-8"))
-                                > self.config.max_cell_output_size
-                            ):
+                            if len(data_as_str.encode("utf-8")) > self.config.max_cell_output_size:
                                 output_dict["data"][mime_type] = [
                                     f"<stream data too large: {len(data_as_str.encode('utf-8'))} bytes, first 256 chars: {data_as_str[:256]}...>"
                                 ]
@@ -86,17 +74,12 @@ class OutputToolsProvider:
                                     f"[Tool: notebook_read_cell_output] Truncated large stream data for mime_type '{mime_type}' in cell {cell_index}."
                                 )
 
-                elif "text" in output_dict and isinstance(
-                    output_dict["text"], (str, list)
-                ):
+                elif "text" in output_dict and isinstance(output_dict["text"], (str, list)):
                     text_content = output_dict["text"]
                     if isinstance(text_content, list):
                         text_content = "".join(text_content)
 
-                    if (
-                        len(text_content.encode("utf-8"))
-                        > self.config.max_cell_output_size
-                    ):
+                    if len(text_content.encode("utf-8")) > self.config.max_cell_output_size:
                         output_dict["text"] = (
                             f"<text data too large: {len(text_content.encode('utf-8'))} bytes, first 256 chars: {text_content[:256]}...>"
                         )
@@ -121,16 +104,12 @@ class OutputToolsProvider:
             logger.error(f"[Tool: notebook_read_cell_output] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_read_cell_output] FAILED - Unexpected error: {e}"
-            )
+            logger.exception(f"[Tool: notebook_read_cell_output] FAILED - Unexpected error: {e}")
             raise RuntimeError(
                 f"An unexpected error occurred while reading cell outputs for cell {cell_index}: {e}"
             ) from e
 
-    async def notebook_clear_cell_outputs(
-        self, notebook_path: str, cell_index: int
-    ) -> str:
+    async def notebook_clear_cell_outputs(self, notebook_path: str, cell_index: int) -> str:
         """Clears the output(s) and execution count of a specific code cell.
 
         Args:
@@ -141,16 +120,12 @@ class OutputToolsProvider:
         Returns:
             A success message string.
         """
-        logger.debug(
-            f"[Tool: notebook_clear_cell_outputs] Called. Args: path={notebook_path}, index={cell_index}"
-        )
+        logger.debug(f"[Tool: notebook_clear_cell_outputs] Called. Args: path={notebook_path}, index={cell_index}")
         modified = False
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
             if not 0 <= cell_index < len(nb.cells):
-                raise IndexError(
-                    f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1})."
-                )
+                raise IndexError(f"Cell index {cell_index} is out of bounds (0-{len(nb.cells) - 1}).")
 
             cell = nb.cells[cell_index]
             if cell.cell_type == "code":
@@ -171,9 +146,7 @@ class OutputToolsProvider:
                     logger.debug(
                         f"[Tool: notebook_clear_cell_outputs] Cell {cell_index} in {notebook_path} is a code cell but had no outputs or execution count to clear."
                     )
-                    return (
-                        f"Cell {cell_index} had no outputs or execution count to clear."
-                    )
+                    return f"Cell {cell_index} had no outputs or execution count to clear."
             else:
                 logger.warning(
                     f"[Tool: notebook_clear_cell_outputs] Cell {cell_index} in {notebook_path} is not a code cell (type: {cell.cell_type}), skipping output clearing."
@@ -198,12 +171,8 @@ class OutputToolsProvider:
             logger.error(f"[Tool: notebook_clear_cell_outputs] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_clear_cell_outputs] FAILED - Unexpected error: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while clearing cell outputs: {e}"
-            ) from e
+            logger.exception(f"[Tool: notebook_clear_cell_outputs] FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred while clearing cell outputs: {e}") from e
 
     async def notebook_clear_all_outputs(self, notebook_path: str) -> str:
         """Clears all outputs and execution counts from all code cells in a notebook.
@@ -214,9 +183,7 @@ class OutputToolsProvider:
         Returns:
             A success message string indicating how many cells were cleared.
         """
-        logger.debug(
-            f"[Tool: notebook_clear_all_outputs] Called. Args: path={notebook_path}"
-        )
+        logger.debug(f"[Tool: notebook_clear_all_outputs] Called. Args: path={notebook_path}")
         cleared_count = 0
         try:
             nb = await self.read_notebook(notebook_path, self.config.allow_root_dirs)
@@ -236,9 +203,7 @@ class OutputToolsProvider:
                         )
 
             if cleared_count > 0:
-                await self.write_notebook(
-                    notebook_path, nb, self.config.allow_root_dirs
-                )
+                await self.write_notebook(notebook_path, nb, self.config.allow_root_dirs)
                 logger.info(
                     f"[Tool: notebook_clear_all_outputs] SUCCESS - Cleared outputs for {cleared_count} code cells in {notebook_path}.",
                     tool_success=True,
@@ -260,13 +225,5 @@ class OutputToolsProvider:
             logger.error(f"[Tool: notebook_clear_all_outputs] FAILED - {e}")
             raise
         except Exception as e:
-            logger.exception(
-                f"[Tool: notebook_clear_all_outputs] FAILED - Unexpected error: {e}"
-            )
-            raise RuntimeError(
-                f"An unexpected error occurred while clearing all outputs: {e}"
-            ) from e
-
-
-# Remove original placeholder comments
-# ... existing code ...
+            logger.exception(f"[Tool: notebook_clear_all_outputs] FAILED - Unexpected error: {e}")
+            raise RuntimeError(f"An unexpected error occurred while clearing all outputs: {e}") from e

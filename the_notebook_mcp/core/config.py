@@ -36,7 +36,7 @@ class ServerConfig:
         """
 
         self.command = None
-        self.version = __version__
+        self.version = __version__.__version__
         self.allow_root_dirs = []
         self.max_cell_source_size = 10 * 1024 * 1024  # 10 MiB
         self.max_cell_output_size = 10 * 1024 * 1024  # 10 MiB
@@ -99,38 +99,26 @@ class ServerConfig:
         """
 
         if self.command == "start" and not self.allow_root_dirs:
-            raise ValueError(
-                "At least one --allow-root must be specified for the 'start' command"
-            )
+            raise ValueError("At least one --allow-root must be specified for the 'start' command")
 
         # Validate all allow_root_dirs are absolute paths and exist
         # Only validate if allow_root_dirs is not empty (e.g. for 'start' command)
         if self.allow_root_dirs:
             for dir_path in self.allow_root_dirs:
                 if not os.path.isabs(dir_path):
-                    raise ValueError(
-                        f"--allow-root must be an absolute path: {dir_path}"
-                    )
+                    raise ValueError(f"--allow-root must be an absolute path: {dir_path}")
 
                 if not os.path.isdir(dir_path):
-                    raise ValueError(
-                        f"--allow-root directory does not exist: {dir_path}"
-                    )
+                    raise ValueError(f"--allow-root directory does not exist: {dir_path}")
 
         if self.max_cell_source_size <= 0:
-            raise ValueError(
-                f"--max-cell-source-size must be positive: {self.max_cell_source_size}"
-            )
+            raise ValueError(f"--max-cell-source-size must be positive: {self.max_cell_source_size}")
 
         if self.max_cell_output_size <= 0:
-            raise ValueError(
-                f"--max-cell-output-size must be positive: {self.max_cell_output_size}"
-            )
+            raise ValueError(f"--max-cell-output-size must be positive: {self.max_cell_output_size}")
 
         if self.transport not in self.VALID_TRANSPORTS:
-            raise ValueError(
-                f"Invalid transport: {self.transport}. Must be one of {', '.join(self.VALID_TRANSPORTS)}"
-            )
+            raise ValueError(f"Invalid transport: {self.transport}. Must be one of {', '.join(self.VALID_TRANSPORTS)}")
 
         if self.transport in ["streamable-http", "sse"]:
             if not 1 <= self.port <= 65535:

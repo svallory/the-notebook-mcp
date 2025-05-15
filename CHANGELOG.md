@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2024-05-14
+
+### Added
+- Added notebook_execute_cell tool for executing cells and retrieving outputs
+
 ### Changed
-- Migrated to FastMCP 2 and restructured the project.
+- Migrated to FastMCP 2 and restructured the project
+- Improved notebook_execute_cell to preserve kernel state between calls, allowing sequential execution with shared variables
+- Simplified server URL handling by using URLs as provided without modification
+- Single-source version in `__version__.py` using dynamic versioning in pyproject.toml
+
+### Fixed
+- Fixed version display bug in startup banner (was showing module object instead of version string)
+
+### Removed
+- Removed diagnostic_tools.py module and diagnose_imports tool functionality
+- Removed references to diagnostic tools in documentation and tests
 
 ## [0.2.3] - 2025-04-20
 
@@ -67,4 +82,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Utility: `notebook_validate`, `notebook_export` (via `nbconvert`)
 - Basic `README.md` with installation, usage, and integration instructions.
 - `pyproject.toml` for packaging and dependency management.
-- Test suite using `pytest`. 
+- Test suite using `pytest`.

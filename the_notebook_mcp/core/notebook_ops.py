@@ -29,21 +29,14 @@ def is_path_allowed(target_path: str, allowed_roots: List[str]) -> bool:
         try:
             # Ensure allowed_root is also absolute and resolved
             abs_allowed_root = os.path.realpath(allowed_root)
-            if (
-                abs_target_path.startswith(abs_allowed_root + os.sep)
-                or abs_target_path == abs_allowed_root
-            ):
-                logger.trace(
-                    f"Path '{abs_target_path}' allowed within root '{abs_allowed_root}'"
-                )
+            if abs_target_path.startswith(abs_allowed_root + os.sep) or abs_target_path == abs_allowed_root:
+                logger.trace(f"Path '{abs_target_path}' allowed within root '{abs_allowed_root}'")
                 return True
         except Exception as e:
             logger.error(f"Error resolving allowed root '{allowed_root}': {e}")
             continue
 
-    logger.warning(
-        f"Security check failed: Path '{abs_target_path}' is outside allowed roots: {allowed_roots}"
-    )
+    logger.warning(f"Security check failed: Path '{abs_target_path}' is outside allowed roots: {allowed_roots}")
     return False
 
 
@@ -57,14 +50,10 @@ async def read_notebook(
         raise ValueError("Invalid notebook path: Only absolute paths are allowed.")
 
     if not is_path_allowed(notebook_path, allowed_roots):
-        raise PermissionError(
-            f"Access denied: Path '{notebook_path}' is outside the allowed workspace roots."
-        )
+        raise PermissionError(f"Access denied: Path '{notebook_path}' is outside the allowed workspace roots.")
 
     if not notebook_path.endswith(".ipynb"):
-        raise ValueError(
-            f"Invalid file type: '{notebook_path}' must point to a .ipynb file."
-        )
+        raise ValueError(f"Invalid file type: '{notebook_path}' must point to a .ipynb file.")
 
     resolved_path = os.path.realpath(notebook_path)
     if not os.path.isfile(resolved_path):
@@ -86,18 +75,12 @@ async def write_notebook(
     notebook_path: str,
     nb_node: nbformat.NotebookNode,
     allowed_roots: List[str],
-    max_notebook_size: int = 10
-    * 1024
-    * 1024,  # Default 10MB, should come from config eventually
+    max_notebook_size: int = 10 * 1024 * 1024,  # Default 10MB, should come from config eventually
 ):
     """Writes a notebook node to a file safely."""
     if not os.path.isabs(notebook_path):
-        logger.error(
-            f"Security Risk: Received non-absolute path for writing: {notebook_path}"
-        )
-        raise ValueError(
-            "Invalid notebook path: Only absolute paths are allowed for writing."
-        )
+        logger.error(f"Security Risk: Received non-absolute path for writing: {notebook_path}")
+        raise ValueError("Invalid notebook path: Only absolute paths are allowed for writing.")
 
     if not is_path_allowed(notebook_path, allowed_roots):
         raise PermissionError(
@@ -105,9 +88,7 @@ async def write_notebook(
         )
 
     if not notebook_path.endswith(".ipynb"):
-        raise ValueError(
-            f"Invalid file type: '{notebook_path}' must point to a .ipynb file for writing."
-        )
+        raise ValueError(f"Invalid file type: '{notebook_path}' must point to a .ipynb file for writing.")
 
     resolved_path = os.path.realpath(notebook_path)
 

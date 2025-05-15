@@ -134,9 +134,7 @@ def test_parse_arguments_help_subcommand_with_command():
 
     with (
         mock.patch.object(sys, "argv", ["prog_name"] + test_args),
-        mock.patch(
-            "the_notebook_mcp.cli.argparse.ArgumentParser"
-        ) as MockArgumentParser,
+        mock.patch("the_notebook_mcp.cli.argparse.ArgumentParser") as MockArgumentParser,
         pytest.raises(SystemExit) as excinfo,
     ):
         # Get the instance of the ArgumentParser that cli.py creates
@@ -163,9 +161,7 @@ def test_parse_arguments_help_subcommand_with_command():
         # This dictionary will be returned when cli.py accesses `subparsers.choices`
         mock_subparsers_action.choices = {
             "start": mock_start_subparser,
-            "version": mock.Mock(
-                spec=RealArgumentParser, print_help=mock.Mock()
-            ),  # Other parsers
+            "version": mock.Mock(spec=RealArgumentParser, print_help=mock.Mock()),  # Other parsers
             "help": mock.Mock(spec=RealArgumentParser, print_help=mock.Mock()),
         }
 

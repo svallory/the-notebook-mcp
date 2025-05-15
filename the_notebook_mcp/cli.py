@@ -163,10 +163,7 @@ def parse_arguments() -> argparse.Namespace:
         sys.exit(0)
 
     if parsed_args.command == "help":
-        if (
-            hasattr(parsed_args, "help_cmd_show_version")
-            and parsed_args.help_cmd_show_version
-        ):
+        if hasattr(parsed_args, "help_cmd_show_version") and parsed_args.help_cmd_show_version:
             # Fall through: server.py will handle printing the version for 'help --version'
             return parsed_args
         elif parsed_args.cmd_to_help:
