@@ -14,14 +14,14 @@ A Model Context Protocol (MCP) server that enables AI agents to interact with Ju
 
 Although originally designed for Cursor, this MCP server can be used with any MCP-compatible AI assistant tool, such as Claude Code.
 
-## Quick Start
+## Quick Start (no install)
 
 ```bash
-# Install
-uv pip install the-notebook-mcp
-
 # Run (minimal example)
-the-notebook-mcp --allow-root /path/to/your/notebooks
+uvx the-notebook-mcp --allow-root /path/to/your/notebooks
+
+# Too see command options...
+uvx the-notebook-mcp help
 ```
 
 ## Video Walkthrough
@@ -103,14 +103,22 @@ For exporting to certain formats, you may need:
 
 ## Installation
 
-### Standard Installation
+### No Install!
+
+You can run the server directly with
+
+```bash
+uvx the-notebook-mcp --allow-root $PWD
+```
+
+But if you prefer to install it...
 
 ```bash
 # Basic installation (stdio transport only)
-uv pip install the-notebook-mcp
+uv tool install the-notebook-mcp
 
-# With SSE transport support
-uv pip install "the-notebook-mcp[sse]"
+# Using pip
+pip install the-notebook-mcp
 ```
 
 ### Development Installation
@@ -195,15 +203,22 @@ uv run poe test
 
 To configure Cursor to use this server, add settings to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-specific).
 
-### SSE Transport (Recommended)
+### No-Install stdio Transport
 
-Start the server separately, then configure Cursor:
+> [!IMPORTANT]
+> Cursor will expand the `"."` argument, but it does not expand `"./some/folder"`.
 
 ```json
 {
   "mcpServers": {
-    "notebook_mcp": {
-      "url": "http://127.0.0.1:8889/sse"
+    "the-notebook-mcp": {
+      "command": "uvx",
+      "args": [
+        "the-notebook-mcp",
+        "start",
+        "--allow-root",
+        "."
+      ]
     }
   }
 }
@@ -214,11 +229,28 @@ Start the server separately, then configure Cursor:
 ```json
 {
   "mcpServers": {
-    "notebook_mcp": {
-      "command": "/absolute/path/to/venv/bin/the-notebook-mcp",
+    "the-notebook-mcp": {
+      "command": "the-notebook-mcp",
       "args": [
-        "--allow-root", "/absolute/path/to/your/notebooks"
+        "start",
+        "--allow-root",
+        "."
       ]
+    }
+  }
+}
+```
+
+### SSE Transport (Recommended)
+
+> [!NOTE]
+> You'll need to run the server separately
+
+```json
+{
+  "mcpServers": {
+    "notebook_mcp": {
+      "url": "http://127.0.0.1:8889/sse"
     }
   }
 }
